@@ -173,6 +173,24 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'UserMessage' }, async ($, e, next) => {
+    // The row carries the prompt as typed, so the secrets are still in it: box them on screen.
+    const typed = (await read($, isOn)) && ['composer', 'sdk', 'bridge'].includes(e.props.origin.kind) ? find(e.props.text) : []
+    if (typed.length > 0) {
+      const segs: Seg[] = []
+      let from = 0
+      for (const hit of typed) {
+        segs.push({ plain: e.props.text.slice(from, hit.start) })
+        segs.push({ label: hit.label, original: hit.original })
+        from = hit.end
+      }
+      segs.push({ plain: e.props.text.slice(from) })
+
+      return view(segs, $.ui.resolve(e), async (item, surface) => {
+        const done = await $.ui.copy({ text: item.original ?? '', surface: surface as typeof e.surface })
+        $.ui.toast(done.isCopied ? `Copied ${item.label}` : 'Could not copy')
+      })
+    }
+
     const found = [...e.props.text.matchAll(PLACEHOLDER)]
     if (found.length === 0) {
       return next(e)

@@ -8,10 +8,10 @@ import type { ModeName } from '../types'
 const mode = atom({ plugin: 'reply-modes', key: 'mode' } as const, 'off')
 
 const MODES: { name: ModeName; label: string; note: string }[] = [
-  { name: 'short', label: 'Ngắn', note: 'Trả lời tối đa 3 câu.' },
-  { name: 'detail', label: 'Chi tiết', note: 'Trả lời đầy đủ, có lập luận và ví dụ.' },
-  { name: 'ask-me', label: 'Hỏi tôi', note: 'Dùng coaching: đặt câu hỏi giúp tôi tự làm rõ vấn đề, chưa đưa đáp án ngay.' },
-  { name: 'critique', label: 'Phản biện', note: 'Chỉ nêu rủi ro, điểm yếu và phương án thay thế.' },
+  { name: 'short', label: 'Short', note: 'Trả lời tối đa 3 câu.' },
+  { name: 'detail', label: 'Detail', note: 'Trả lời đầy đủ, có lập luận và ví dụ.' },
+  { name: 'ask-me', label: 'Ask me', note: 'Dùng coaching: đặt câu hỏi giúp tôi tự làm rõ vấn đề, chưa đưa đáp án ngay.' },
+  { name: 'critique', label: 'Critique', note: 'Chỉ nêu rủi ro, điểm yếu và phương án thay thế.' },
 ]
 
 const ICON = { short: 'zap', detail: 'list', 'ask-me': 'circle-help', critique: 'shield-alert', off: 'circle' } as const
