@@ -120,20 +120,49 @@ const view = (segs: Seg[], ui: { Box: any; Button: any; Text: any; Svg?: any }, 
             if ('plain' in seg) return <Text>{seg.plain}</Text>
             const id = n
             n += 1
-            return (
-              <Box gap={1}>
-                <Button key={`hidden-${id}`} plain onPress={(press: { surface: unknown }) => copy(seg, press.surface)}>
-                  <Text backgroundColor="#3b3b3b" color="#ffe066">
-                    {' ████████ '}
-                    <Text dimColor>{seg.label}{ui.Svg === undefined ? ' ⧉ ' : ' '}</Text>
-                  </Text>
-                </Button>
-                {ui.Svg !== undefined && icon(ui, 'copy', '#9ca3af', '', 14)}
-              </Box>
-            )
+            return chip(ui, `hidden-${id}`, '████████ ', seg.label, '#ffe066', (press: { surface: unknown }) => copy(seg, press.surface))
           })}
         </Box>
       ))}
+    </Box>
+  )
+}
+
+// One chip: the copy icon sits inside the same coloured block as the pressable label,
+// so the two read as a single control. An icon cannot be a Button's child, so the press
+// is the label's; where there is no Svg a glyph stands in.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const chip = (ui: { Box: any; Button: any; Text: any; Svg?: any }, id: string, face: string, label: string, color: string, onPress: (press: { surface: unknown }) => void) => {
+  const { Box, Button, Text } = ui
+  const hasSvg = ui.Svg !== undefined
+  const text = (
+    <Text color={color}>
+      {face}
+      <Text>{label}{hasSvg ? '' : ' ⧉'}</Text>
+    </Text>
+  )
+
+  return hasSvg ? (
+    <Box backgroundColor="#3b3b3b" paddingX={1} gap={1}>
+      <Button key={id} plain onPress={onPress}>{text}</Button>
+      {icon(ui, 'copy', color, '', 14)}
+    </Box>
+  ) : (
+    <Button key={id} plain onPress={onPress}>
+      <Text backgroundColor="#3b3b3b">{text}</Text>
+    </Button>
+  )
+}
+
+// A user's row sits on the right in a rounded-looking block, as the surface draws it.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const bubble = (ui: { Box: any }, tree: unknown) => {
+  const { Box } = ui
+  return (
+    <Box justifyContent="flex-end">
+      <Box backgroundColor="#2b2b2b" borderStyle="round" borderColor="#2b2b2b" paddingX={1} flexDirection="column">
+        {tree}
+      </Box>
     </Box>
   )
 }
@@ -185,10 +214,15 @@ export const register: Register = on => {
       }
       segs.push({ plain: e.props.text.slice(from) })
 
-      return view(segs, $.ui.resolve(e), async (item, surface) => {
-        const done = await $.ui.copy({ text: item.original ?? '', surface: surface as typeof e.surface })
-        $.ui.toast(done.isCopied ? `Copied ${item.label}` : 'Could not copy')
-      })
+      const ui = $.ui.resolve(e)
+
+      return bubble(
+        ui,
+        view(segs, ui, async (item, surface) => {
+          const done = await $.ui.copy({ text: item.original ?? '', surface: surface as typeof e.surface })
+          $.ui.toast(done.isCopied ? `Copied ${item.label}` : 'Could not copy')
+        }),
+      )
     }
 
     const found = [...e.props.text.matchAll(PLACEHOLDER)]
@@ -207,14 +241,19 @@ export const register: Register = on => {
     })
     segs.push({ plain: e.props.text.slice(at) })
 
-    return view(segs, $.ui.resolve(e), async (item, surface) => {
-      if (item.original === undefined) {
-        $.ui.toast('Original not kept (reloaded since it was sent)')
-        return
-      }
-      const done = await $.ui.copy({ text: item.original, surface: surface as typeof e.surface })
-      $.ui.toast(done.isCopied ? `Copied ${item.label}` : 'Could not copy')
-    })
+    const ui = $.ui.resolve(e)
+
+    return bubble(
+      ui,
+      view(segs, ui, async (item, surface) => {
+        if (item.original === undefined) {
+          $.ui.toast('Original not kept (reloaded since it was sent)')
+          return
+        }
+        const done = await $.ui.copy({ text: item.original, surface: surface as typeof e.surface })
+        $.ui.toast(done.isCopied ? `Copied ${item.label}` : 'Could not copy')
+      }),
+    )
   })
 
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
@@ -269,12 +308,7 @@ export const register: Register = on => {
               <Box flexDirection="column" borderStyle="round" paddingX={1}>
                 <Box justifyContent="space-between">
                   <Text dimColor>{lang === '' ? 'code' : lang}</Text>
-                  <Box gap={1}>
-                    {hasSvg && icon(ui, 'copy', '#7dff9a', '')}
-                    <Button key={`code-${b}`} plain onPress={press => copy(body, 'original code', press.surface)}>
-                      <Text color="#7dff9a">{hasSvg ? 'Copy (original)' : '⧉ Copy (original)'}</Text>
-                    </Button>
-                  </Box>
+                  {chip(ui, `code-${b}`, '', 'Copy (original)', '#7dff9a', press => copy(body, 'original code', press.surface as typeof e.surface))}
                 </Box>
                 {view(segs, ui, (item, surface) =>
                   copy(item.original ?? '', item.label, surface as typeof e.surface),
@@ -311,22 +345,10 @@ export const register: Register = on => {
               />
               <Box gap={1} flexWrap="wrap">
                 {hits.map((hit, i) => (
-                  <Box gap={1}>
-                    <Button
-                      key={`hidden-${b}-${i}`}
-                      plain
-                      onPress={async press => {
-                        const done = await $.ui.copy({ text: hit.original, surface: press.surface })
-                        $.ui.toast(done.isCopied ? `Copied ${hit.label}` : 'Could not copy')
-                      }}
-                    >
-                      <Text backgroundColor="#3b3b3b" color="#ffe066">
-                        {' ████████ '}
-                        <Text dimColor>{hit.label}{hasSvg ? ' ' : ' ⧉ '}</Text>
-                      </Text>
-                    </Button>
-                    {hasSvg && icon(ui, 'copy', '#9ca3af', '', 14)}
-                  </Box>
+                  chip(ui, `hidden-${b}-${i}`, '████████ ', hit.label, '#ffe066', async press => {
+                    const done = await $.ui.copy({ text: hit.original, surface: press.surface as typeof e.surface })
+                    $.ui.toast(done.isCopied ? `Copied ${hit.label}` : 'Could not copy')
+                  })
                 ))}
               </Box>
             </Box>
