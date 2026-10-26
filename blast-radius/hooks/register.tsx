@@ -34,14 +34,32 @@ const score = (files: Touch[], bad: Risky[]) =>
 
 const level = (n: number) => (n >= 15 ? 'HIGH' : n >= 6 ? 'MEDIUM' : 'LOW')
 
-export const register: Register = on => {
+const parse = (raw: unknown) =>
+  String(raw ?? '')
+    .split(',')
+    .map(one => one.trim())
+    .filter(one => one !== '')
+    .flatMap(one => {
+      try {
+        return [new RegExp(one)]
+      } catch {
+        return []
+      }
+    })
+
+export const register: Register = (on, options) => {
+  const extraRules = parse(options.extraRiskyPatterns).map(re => ({ re, reason: 'your pattern', weight: 5 }))
+  const toastFrom = Number(options.toastFrom ?? 7)
+
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'blast-radius',
       description: 'Show how far this session’s changes reach',
     })
 
-    void $.ui.open({ id: PANE, title: 'Blast radius' })
+    if (options.openPaneAtStart !== false) {
+      void $.ui.open({ id: PANE, title: 'Blast radius' })
+    }
 
     return next(e)
   })
@@ -66,14 +84,14 @@ export const register: Register = on => {
     } else if (e.tool === 'Bash') {
       const command = String((e as Record<string, unknown>).command ?? '')
       await update($, commands, n => n + 1)
-      const rule = RULES.filter(r => r.re.test(command)).sort(
+      const rule = [...RULES, ...extraRules].filter(r => r.re.test(command)).sort(
         (a, b) => b.weight - a.weight,
       )[0]
       if (rule !== undefined) {
         await update($, risky, list =>
           [...list, { command: command.slice(0, 120), reason: rule.reason, weight: rule.weight }].slice(-50),
         )
-        if (rule.weight >= 7) {
+        if (rule.weight >= toastFrom) {
           $.ui.toast(`Blast radius: ${rule.reason}`)
         }
       }

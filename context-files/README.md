@@ -15,6 +15,12 @@ Commands: /context-files.
 
 Built for Claude Code mods (hook modules). Nothing here runs outside your machine: the mod reads session events and draws its own interface.
 
+## Options
+
+You set these when you install the mod, and can change them later in the Claude Code config menu.
+
+- **Start expanded** (`startExpanded`, default `true`): Open the band with the full file list; off starts it collapsed to one line.
+
 ## License
 
 MIT, Copyright (c) 2026 Jackie.

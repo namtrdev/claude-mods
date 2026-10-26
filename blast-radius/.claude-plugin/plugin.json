@@ -10,5 +10,25 @@
   "keywords": [
     "claude-code",
     "mod"
-  ]
+  ],
+  "userConfig": {
+    "openPaneAtStart": {
+      "type": "boolean",
+      "title": "Open the pane at start",
+      "description": "Open the Blast radius pane when a session begins; off opens it only with /blast-radius.",
+      "default": true
+    },
+    "toastFrom": {
+      "type": "number",
+      "title": "Notify from risk weight",
+      "description": "Show a notice for a risky command at or above this weight (1 to 9). Lower notifies more often.",
+      "default": 7
+    },
+    "extraRiskyPatterns": {
+      "type": "string",
+      "title": "Extra risky commands",
+      "description": "Regular expressions for commands to count as risky (weight 5), comma separated. Example: terraform apply,kubectl delete",
+      "default": ""
+    }
+  }
 }

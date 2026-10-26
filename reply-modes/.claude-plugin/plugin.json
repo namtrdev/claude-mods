@@ -10,5 +10,31 @@
   "keywords": [
     "claude-code",
     "mod"
-  ]
+  ],
+  "userConfig": {
+    "shortNote": {
+      "type": "string",
+      "title": "Short: instruction",
+      "description": "The line added to your message in Short mode.",
+      "default": "Tr\u1ea3 l\u1eddi t\u1ed1i \u0111a 3 c\u00e2u."
+    },
+    "detailNote": {
+      "type": "string",
+      "title": "Detail: instruction",
+      "description": "The line added to your message in Detail mode.",
+      "default": "Tr\u1ea3 l\u1eddi \u0111\u1ea7y \u0111\u1ee7, c\u00f3 l\u1eadp lu\u1eadn v\u00e0 v\u00ed d\u1ee5."
+    },
+    "askMeNote": {
+      "type": "string",
+      "title": "Ask me: instruction",
+      "description": "The line added to your message in Ask me mode.",
+      "default": "D\u00f9ng coaching: \u0111\u1eb7t c\u00e2u h\u1ecfi gi\u00fap t\u00f4i t\u1ef1 l\u00e0m r\u00f5 v\u1ea5n \u0111\u1ec1, ch\u01b0a \u0111\u01b0a \u0111\u00e1p \u00e1n ngay."
+    },
+    "critiqueNote": {
+      "type": "string",
+      "title": "Critique: instruction",
+      "description": "The line added to your message in Critique mode.",
+      "default": "Ch\u1ec9 n\u00eau r\u1ee7i ro, \u0111i\u1ec3m y\u1ebfu v\u00e0 ph\u01b0\u01a1ng \u00e1n thay th\u1ebf."
+    }
+  }
 }

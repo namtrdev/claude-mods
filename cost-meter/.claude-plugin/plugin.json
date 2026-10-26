@@ -10,5 +10,23 @@
   "keywords": [
     "claude-code",
     "mod"
-  ]
+  ],
+  "userConfig": {
+    "defaultTtl": {
+      "type": "string",
+      "title": "Default cache TTL",
+      "description": "Which prompt-cache lifetime the countdown assumes until you press a TTL button.",
+      "default": "5m",
+      "options": [
+        "5m",
+        "1h"
+      ]
+    },
+    "showCacheClock": {
+      "type": "boolean",
+      "title": "Show the cache countdown",
+      "description": "Show the second row with the cache clock and the TTL buttons.",
+      "default": true
+    }
+  }
 }

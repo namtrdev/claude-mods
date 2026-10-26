@@ -50,7 +50,25 @@ const deepMask = (value: unknown, tally: { n: number }): unknown => {
   return value
 }
 
-export const register: Register = on => {
+const parse = (raw: unknown) =>
+  String(raw ?? '')
+    .split(',')
+    .map(one => one.trim())
+    .filter(one => one !== '')
+    .flatMap(one => {
+      try {
+        return [new RegExp(one)]
+      } catch {
+        return []
+      }
+    })
+
+export const register: Register = (on, options) => {
+  const extraAllowed = parse(options.extraAllowedFiles)
+  const warnOnly = options.onWrite === 'warn'
+  const guardCommits = options.guardCommits !== false
+  const maskResults = options.maskResults !== false
+
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'secret-guard',
@@ -80,15 +98,18 @@ export const register: Register = on => {
       const body = [input.content, input.new_string, ...edits.map(one => one.new_string)]
         .filter((one): one is string => typeof one === 'string')
         .join('\n')
-      const found = ALLOWED.test(path) ? [] : labelsIn(body)
+      const found = ALLOWED.test(path) || extraAllowed.some(re => re.test(path)) ? [] : labelsIn(body)
       if (found.length > 0) {
-        return {
-          deny: `secret-guard: ${path} would contain ${[...new Set(found)].join(', ')}. Read it from an environment variable or a .env file instead.`,
+        const why = `secret-guard: ${path} would contain ${[...new Set(found)].join(', ')}.`
+        if (warnOnly) {
+          $.ui.toast(why)
+        } else {
+          return { deny: `${why} Read it from an environment variable or a .env file instead.` }
         }
       }
     }
 
-    if (e.tool === 'Bash' && /\bgit\s+commit\b/.test(String(input.command ?? ''))) {
+    if (guardCommits && e.tool === 'Bash' && /\bgit\s+commit\b/.test(String(input.command ?? ''))) {
       try {
         const staged = await $.tool.call({ tool: 'Bash', command: 'git diff --cached' })
         const found = labelsIn(String((staged as { text?: string }).text ?? ''))
@@ -103,7 +124,7 @@ export const register: Register = on => {
     }
 
     const ran = await next(e)
-    if (ran.deny !== undefined || ran.result === undefined) {
+    if (!maskResults || ran.deny !== undefined || ran.result === undefined) {
       return ran
     }
     const tally = { n: 0 }

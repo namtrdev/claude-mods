@@ -7,7 +7,7 @@ import type { ModeName } from '../types'
 
 const mode = atom({ plugin: 'reply-modes', key: 'mode' } as const, 'off')
 
-const MODES: { name: ModeName; label: string; note: string }[] = [
+const BASE_MODES: { name: ModeName; label: string; note: string }[] = [
   { name: 'short', label: 'Short', note: 'Trả lời tối đa 3 câu.' },
   { name: 'detail', label: 'Detail', note: 'Trả lời đầy đủ, có lập luận và ví dụ.' },
   { name: 'ask-me', label: 'Ask me', note: 'Dùng coaching: đặt câu hỏi giúp tôi tự làm rõ vấn đề, chưa đưa đáp án ngay.' },
@@ -16,7 +16,14 @@ const MODES: { name: ModeName; label: string; note: string }[] = [
 
 const ICON = { short: 'zap', detail: 'list', 'ask-me': 'circle-help', critique: 'shield-alert', off: 'circle' } as const
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  const MODES = BASE_MODES.map(one => {
+    const key = { short: 'shortNote', detail: 'detailNote', 'ask-me': 'askMeNote', critique: 'critiqueNote', off: '' }[one.name]
+    const custom = key === '' ? undefined : options[key]
+
+    return typeof custom === 'string' && custom.trim() !== '' ? { ...one, note: custom } : one
+  })
+
   on('session.start', async ($, e, next) => {
     for (const one of MODES) {
       await $.command.register({ name: one.name, description: `Reply mode: ${one.label}. ${one.note}` })

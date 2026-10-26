@@ -10,5 +10,35 @@
   "keywords": [
     "claude-code",
     "mod"
-  ]
+  ],
+  "userConfig": {
+    "maskResults": {
+      "type": "boolean",
+      "title": "Mask secrets in tool results",
+      "description": "Hide secrets in what Read, Bash and other tools return to the model.",
+      "default": true
+    },
+    "onWrite": {
+      "type": "string",
+      "title": "When a write would hold a secret",
+      "description": "block refuses the write; warn shows a notice and lets it through.",
+      "default": "block",
+      "options": [
+        "block",
+        "warn"
+      ]
+    },
+    "guardCommits": {
+      "type": "boolean",
+      "title": "Check staged changes before git commit",
+      "description": "Refuse git commit when the staged changes hold a secret.",
+      "default": true
+    },
+    "extraAllowedFiles": {
+      "type": "string",
+      "title": "Extra files allowed to hold secrets",
+      "description": "Regular expressions for file paths, comma separated. Files named .env are always allowed. Example: secrets\\.yaml$,\\.local\\.json$",
+      "default": ""
+    }
+  }
 }

@@ -17,7 +17,9 @@ const summarize = (tool: string, e: object): string => {
   return `${tool} ${String(detail).replace(/\s+/g, ' ').slice(0, 80)}`.trim()
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  const speed = Math.max(100, Number(options.playSpeedMs ?? 800))
+  const maxSteps = Math.max(10, Number(options.maxSteps ?? 500))
   let timer: { cancel: () => void } | undefined
 
   on('session.start', async ($, e, next) => {
@@ -26,7 +28,9 @@ export const register: Register = on => {
       description: 'Open the Replay Theater pane',
     })
 
-    void $.ui.open({ id: PANE, title: 'Replay Theater' })
+    if (options.openPaneAtStart !== false) {
+      void $.ui.open({ id: PANE, title: 'Replay Theater' })
+    }
 
     return next(e)
   })
@@ -46,7 +50,7 @@ export const register: Register = on => {
       summary: summarize(e.tool, e),
       isError: false,
     }
-    await update($, steps, list => [...list, step].slice(-500))
+    await update($, steps, list => [...list, step].slice(-maxSteps))
     const ran = await next(e)
     if (ran.deny !== undefined || ran.isError === true) {
       await update($, steps, list =>
@@ -80,7 +84,7 @@ export const register: Register = on => {
       if (list.length === 0) return
       await update($, isPlaying, () => true)
       if (at >= list.length - 1) await update($, cursor, () => -1)
-      timer = $.clock.every(800, async () => {
+      timer = $.clock.every(speed, async () => {
         const [all, now] = [await read($, steps), await read($, cursor)]
         if (now >= all.length - 1) {
           timer?.cancel(); timer = undefined

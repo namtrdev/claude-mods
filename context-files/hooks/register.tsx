@@ -22,12 +22,13 @@ const tokens = (chars: number) => {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'context-files',
       description: 'Expand or collapse the loaded-instruction-files band',
     })
+    await update($, isExpanded, () => options.startExpanded !== false)
     $.ui.invalidate('prompt.context')
 
     return next(e)

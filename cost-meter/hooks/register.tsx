@@ -23,14 +23,17 @@ const hit = (u: TurnUse) => {
   return all === 0 ? 0 : Math.round((u.read / all) * 100)
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
   let timer: { cancel: () => void } | undefined
 
   on('session.start', async ($, e, next) => {
+    if ((await read($, lastAt)) === 0) {
+      await update($, ttl, () => (options.defaultTtl === '1h' ? '1h' : '5m'))
+    }
     timer?.cancel()
     timer = $.clock.every(1000, async () => {
       const at = await read($, lastAt)
-      if (at === 0) return
+      if (at === 0 || options.showCacheClock === false) return
       const left = at + TTL_MS[await read($, ttl)] - (await $.clock.now())
       $.ui.status(left > 0 ? `cache warm ${clock(left)}` : 'cache cold')
       $.ui.invalidate('ui.render')
@@ -90,6 +93,7 @@ export const register: Register = on => {
             session in {k(sum.input + sum.read + sum.write)} · out {k(sum.output)} · cache {hit(sum)}%
           </Text>
         </Box>
+        {options.showCacheClock !== false && (
         <Box gap={2}>
           <Box gap={1}>
             {hasSvg && icon(ui, 'timer', left > 0 ? '#7dff9a' : '#9ca3af', '')}
@@ -105,6 +109,7 @@ export const register: Register = on => {
             </Box>
           ))}
         </Box>
+        )}
       </Box>
     )
   })

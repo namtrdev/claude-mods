@@ -10,5 +10,13 @@
   "keywords": [
     "claude-code",
     "mod"
-  ]
+  ],
+  "userConfig": {
+    "startExpanded": {
+      "type": "boolean",
+      "title": "Start expanded",
+      "description": "Open the band with the full file list; off starts it collapsed to one line.",
+      "default": true
+    }
+  }
 }

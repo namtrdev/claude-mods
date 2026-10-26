@@ -10,5 +10,37 @@
   "keywords": [
     "claude-code",
     "mod"
-  ]
+  ],
+  "userConfig": {
+    "maskKeys": {
+      "type": "boolean",
+      "title": "Mask keys and passwords",
+      "description": "Mask API keys, tokens, JWTs, private keys and password=... values.",
+      "default": true
+    },
+    "maskEmail": {
+      "type": "boolean",
+      "title": "Mask email addresses",
+      "description": "Replace email addresses with a [hidden:email] box.",
+      "default": true
+    },
+    "maskPhone": {
+      "type": "boolean",
+      "title": "Mask phone numbers",
+      "description": "Mask +country-code numbers and Vietnamese mobile numbers.",
+      "default": true
+    },
+    "maskCard": {
+      "type": "boolean",
+      "title": "Mask card numbers",
+      "description": "Mask 13 to 19 digit numbers that pass the Luhn check.",
+      "default": true
+    },
+    "extraPatterns": {
+      "type": "string",
+      "title": "Extra patterns",
+      "description": "Your own regular expressions to mask, comma separated. Example: EMP-\\d{6},ACME-[A-Z0-9]{8}",
+      "default": ""
+    }
+  }
 }

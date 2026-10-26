@@ -10,5 +10,25 @@
   "keywords": [
     "claude-code",
     "mod"
-  ]
+  ],
+  "userConfig": {
+    "openPaneAtStart": {
+      "type": "boolean",
+      "title": "Open the pane at start",
+      "description": "Open the Replay Theater pane when a session begins; off opens it only with /replay.",
+      "default": true
+    },
+    "playSpeedMs": {
+      "type": "number",
+      "title": "Playback speed (ms per step)",
+      "description": "Delay between steps while playing. Lower is faster.",
+      "default": 800
+    },
+    "maxSteps": {
+      "type": "number",
+      "title": "Steps to keep",
+      "description": "How many recent tool calls the recording holds.",
+      "default": 500
+    }
+  }
 }

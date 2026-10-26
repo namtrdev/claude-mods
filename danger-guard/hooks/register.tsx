@@ -24,10 +24,38 @@ const RULES: { re: RegExp; verdict: 'ask' | 'deny'; reason: string }[] = [
 
 const SENSITIVE_PATH = /(^|\/)(\.ssh|\.aws|\.gnupg|\.kube)\/|(^|\/)\.(bashrc|zshrc|zprofile|profile)$|^\/etc\//
 
-export const register: Register = on => {
+const parse = (raw: unknown) =>
+  String(raw ?? '')
+    .split(',')
+    .map(one => one.trim())
+    .filter(one => one !== '')
+    .flatMap(one => {
+      try {
+        return [new RegExp(one)]
+      } catch {
+        return []
+      }
+    })
+
+export const register: Register = (on, options) => {
+  const rules = RULES.flatMap(rule => {
+    if (options.allowSudo === true && rule.reason === 'runs with root privileges') return []
+    if (rule.reason === 'force push rewrites remote history' && options.forcePush === 'allow') return []
+    if (rule.reason === 'recursive or forced delete' && options.recursiveDelete === 'allow') return []
+    if (rule.reason === 'force push rewrites remote history' && options.forcePush === 'deny') return [{ ...rule, verdict: 'deny' as const }]
+    if (rule.reason === 'recursive or forced delete' && options.recursiveDelete === 'deny') return [{ ...rule, verdict: 'deny' as const }]
+    return [rule]
+  })
+  const extraCommands = parse(options.extraCommands)
+  const extraPaths = parse(options.extraPaths)
+
   on('tool.check', { tool: 'Bash' }, async ($, e, next) => {
     const command = String((e.input as { command?: unknown }).command ?? '')
-    const rule = RULES.find(one => one.re.test(command))
+    const rule =
+      rules.find(one => one.re.test(command)) ??
+      (extraCommands.some(re => re.test(command))
+        ? { verdict: 'ask' as const, reason: 'matches one of your commands to confirm' }
+        : undefined)
     if (rule === undefined) {
       return next(e)
     }
@@ -46,7 +74,7 @@ export const register: Register = on => {
   for (const tool of ['Write', 'Edit', 'MultiEdit'] as const) {
     on('tool.check', { tool }, async ($, e, next) => {
       const path = String((e.input as { file_path?: unknown }).file_path ?? '')
-      if (!SENSITIVE_PATH.test(path)) {
+      if (!SENSITIVE_PATH.test(path) && !extraPaths.some(re => re.test(path))) {
         return next(e)
       }
       const entry: GuardEvent = { at: await $.clock.now(), verdict: 'ask', reason: 'sensitive path', what: path }

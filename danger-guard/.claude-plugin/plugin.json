@@ -10,5 +10,47 @@
   "keywords": [
     "claude-code",
     "mod"
-  ]
+  ],
+  "userConfig": {
+    "allowSudo": {
+      "type": "boolean",
+      "title": "Allow sudo without asking",
+      "description": "Skip the confirmation for commands that use sudo.",
+      "default": false
+    },
+    "forcePush": {
+      "type": "string",
+      "title": "Force push",
+      "description": "What to do before git push --force.",
+      "default": "ask",
+      "options": [
+        "ask",
+        "deny",
+        "allow"
+      ]
+    },
+    "recursiveDelete": {
+      "type": "string",
+      "title": "Recursive delete (rm -rf)",
+      "description": "What to do before a recursive or forced rm outside the root and home cases, which are always refused.",
+      "default": "ask",
+      "options": [
+        "ask",
+        "deny",
+        "allow"
+      ]
+    },
+    "extraCommands": {
+      "type": "string",
+      "title": "Extra commands to confirm",
+      "description": "Regular expressions for commands you want to be asked about, comma separated. Example: terraform apply,docker system prune",
+      "default": ""
+    },
+    "extraPaths": {
+      "type": "string",
+      "title": "Extra protected paths",
+      "description": "Regular expressions for file paths that need confirmation before a write, comma separated. Example: /prod/,\\.pem$",
+      "default": ""
+    }
+  }
 }

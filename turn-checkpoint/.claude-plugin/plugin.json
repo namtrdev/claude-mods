@@ -10,5 +10,19 @@
   "keywords": [
     "claude-code",
     "mod"
-  ]
+  ],
+  "userConfig": {
+    "maxTurns": {
+      "type": "number",
+      "title": "Turns to keep",
+      "description": "How many recent turns keep their saved file originals.",
+      "default": 20
+    },
+    "maxMegabytes": {
+      "type": "number",
+      "title": "Storage limit (MB)",
+      "description": "Oldest turns are dropped once the saved originals pass this size.",
+      "default": 2
+    }
+  }
 }

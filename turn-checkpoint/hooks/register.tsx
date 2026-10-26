@@ -6,13 +6,13 @@ import type { Turn } from '../types'
 const turns = atom({ plugin: 'turn-checkpoint', key: 'turns' } as const, [])
 
 const WRITERS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
-const MAX_TURNS = 20
-const MAX_BYTES = 2_000_000
 
 const size = (list: Turn[]) =>
   list.reduce((sum, t) => sum + t.snaps.reduce((s, one) => s + (one.original?.length ?? 0), 0), 0)
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  const maxTurns = Math.max(1, Number(options.maxTurns ?? 20))
+  const maxBytes = Math.max(0.1, Number(options.maxMegabytes ?? 2)) * 1_000_000
   let counter = 0
 
   on('session.start', async ($, e, next) => {
@@ -27,7 +27,7 @@ export const register: Register = on => {
       counter += 1
       const no = counter
       const at = await $.clock.now()
-      await update($, turns, list => [...list, { no, at, prompt: e.text.slice(0, 60), snaps: [] }].slice(-MAX_TURNS))
+      await update($, turns, list => [...list, { no, at, prompt: e.text.slice(0, 60), snaps: [] }].slice(-maxTurns))
     }
 
     return next(e)
@@ -51,7 +51,7 @@ export const register: Register = on => {
         )
         await update($, turns, all => {
           let kept = all
-          while (kept.length > 1 && size(kept) > MAX_BYTES) kept = kept.slice(1)
+          while (kept.length > 1 && size(kept) > maxBytes) kept = kept.slice(1)
           return kept
         })
       }

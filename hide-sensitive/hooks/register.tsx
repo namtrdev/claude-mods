@@ -44,6 +44,9 @@ const isCard = (raw: string) => {
 type Hit = { start: number; end: number; label: string; original: string }
 type Item = { label: string; original: string }
 
+// The person's choices from the manifest's userConfig; register() fills it in.
+let cfg = { keys: true, email: true, phone: true, card: true, extra: [] as RegExp[] }
+
 const find = (text: string): Hit[] => {
   const hits: Hit[] = []
   const add = (re: RegExp, label: string, ok: (s: string) => boolean = () => true) => {
@@ -53,10 +56,13 @@ const find = (text: string): Hit[] => {
       }
     }
   }
-  for (const rule of RULES) add(rule.re, rule.label)
-  add(ASSIGN, 'secret')
-  add(CARD, 'card', isCard)
-  add(PHONE, 'phone')
+  for (const rule of RULES) {
+    if (rule.label === 'email' ? cfg.email : cfg.keys) add(rule.re, rule.label)
+  }
+  if (cfg.keys) add(ASSIGN, 'secret')
+  if (cfg.card) add(CARD, 'card', isCard)
+  if (cfg.phone) add(PHONE, 'phone')
+  for (const re of cfg.extra) add(re, 'custom')
   hits.sort((a, b) => a.start - b.start || b.end - a.end)
   const kept: Hit[] = []
   for (const hit of hits) {
@@ -154,7 +160,26 @@ const bubble = (ui: { Box: any }, tree: unknown) => {
   )
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  const extra = String(options.extraPatterns ?? '')
+    .split(',')
+    .map(one => one.trim())
+    .filter(one => one !== '')
+    .flatMap(one => {
+      try {
+        return [new RegExp(one, 'g')]
+      } catch {
+        return []
+      }
+    })
+  cfg = {
+    keys: options.maskKeys !== false,
+    email: options.maskEmail !== false,
+    phone: options.maskPhone !== false,
+    card: options.maskCard !== false,
+    extra,
+  }
+
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'hide-sensitive',

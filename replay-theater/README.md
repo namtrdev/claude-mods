@@ -15,6 +15,14 @@ Commands: /replay.
 
 Built for Claude Code mods (hook modules). Nothing here runs outside your machine: the mod reads session events and draws its own interface.
 
+## Options
+
+You set these when you install the mod, and can change them later in the Claude Code config menu.
+
+- **Open the pane at start** (`openPaneAtStart`, default `true`): Open the Replay Theater pane when a session begins; off opens it only with /replay.
+- **Playback speed (ms per step)** (`playSpeedMs`, default `800`): Delay between steps while playing. Lower is faster.
+- **Steps to keep** (`maxSteps`, default `500`): How many recent tool calls the recording holds.
+
 ## License
 
 MIT, Copyright (c) 2026 Jackie.
