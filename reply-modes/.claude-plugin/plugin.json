@@ -1,0 +1,14 @@
+{
+  "name": "reply-modes",
+  "version": "0.1.0",
+  "description": "Reply modes (short, detail, ask-me, critique) as commands and a band above the prompt.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Jackie"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "mod"
+  ]
+}

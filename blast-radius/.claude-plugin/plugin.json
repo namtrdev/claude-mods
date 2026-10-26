@@ -1,0 +1,14 @@
+{
+  "name": "blast-radius",
+  "version": "0.1.0",
+  "description": "Pane that shows how far this session's changes reach: files touched, risky commands, a running risk score.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Jackie"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "mod"
+  ]
+}

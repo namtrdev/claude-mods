@@ -1,0 +1,14 @@
+{
+  "name": "hide-sensitive",
+  "version": "0.1.0",
+  "description": "Masks API keys, tokens, passwords, card numbers and emails in your messages before they reach the model.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Jackie"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "mod"
+  ]
+}

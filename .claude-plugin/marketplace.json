@@ -1,0 +1,53 @@
+{
+  "name": "my-mods",
+  "owner": {
+    "name": "Jackie"
+  },
+  "plugins": [
+    {
+      "name": "blast-radius",
+      "source": "./blast-radius",
+      "description": "Files touched and risky commands this session"
+    },
+    {
+      "name": "replay-theater",
+      "source": "./replay-theater",
+      "description": "Record and replay tool calls"
+    },
+    {
+      "name": "context-files",
+      "source": "./context-files",
+      "description": "Instruction files this session loaded"
+    },
+    {
+      "name": "hide-sensitive",
+      "source": "./hide-sensitive",
+      "description": "Mask secrets and personal data in your messages"
+    },
+    {
+      "name": "secret-guard",
+      "source": "./secret-guard",
+      "description": "Mask secrets in tool results, block writing or committing them"
+    },
+    {
+      "name": "reply-modes",
+      "source": "./reply-modes",
+      "description": "Short, detail, ask-me, critique reply modes"
+    },
+    {
+      "name": "danger-guard",
+      "source": "./danger-guard",
+      "description": "Ask or block destructive commands"
+    },
+    {
+      "name": "turn-checkpoint",
+      "source": "./turn-checkpoint",
+      "description": "Per-turn file snapshots and /undo-turn"
+    },
+    {
+      "name": "cost-meter",
+      "source": "./cost-meter",
+      "description": "Token usage and cache hit band"
+    }
+  ]
+}

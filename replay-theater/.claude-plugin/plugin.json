@@ -1,0 +1,14 @@
+{
+  "name": "replay-theater",
+  "version": "0.1.0",
+  "description": "Pane that records the session's tool calls and replays them step by step or on a timer.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Jackie"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "mod"
+  ]
+}

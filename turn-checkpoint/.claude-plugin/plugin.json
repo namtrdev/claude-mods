@@ -1,0 +1,14 @@
+{
+  "name": "turn-checkpoint",
+  "version": "0.1.0",
+  "description": "Saves each file's original before a turn edits it; /undo-turn restores them.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Jackie"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "mod"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "secret-guard",
+  "version": "0.1.0",
+  "description": "Masks secrets in tool results and blocks writing or committing them.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Jackie"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "mod"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "cost-meter",
+  "version": "0.1.0",
+  "description": "Band showing token usage and cache hit ratio per turn and per session.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Jackie"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "mod"
+  ]
+}

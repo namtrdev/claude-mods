@@ -1,0 +1,14 @@
+{
+  "name": "danger-guard",
+  "version": "0.1.0",
+  "description": "Asks or blocks before destructive commands and writes to sensitive paths.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Jackie"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "mod"
+  ]
+}
