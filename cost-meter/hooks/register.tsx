@@ -6,7 +6,15 @@ import { icon } from './icons'
 import type { TurnUse } from '../types'
 
 const last = atom({ plugin: 'cost-meter', key: 'last' } as const, null)
+const ttl = atom({ plugin: 'cost-meter', key: 'ttl' } as const, '5m')
+const lastAt = atom({ plugin: 'cost-meter', key: 'lastAt' } as const, 0)
 const total = atom({ plugin: 'cost-meter', key: 'total' } as const, { input: 0, output: 0, read: 0, write: 0 })
+
+const TTL_MS = { '5m': 5 * 60_000, '1h': 60 * 60_000 }
+const clock = (ms: number) => {
+  const s = Math.max(0, Math.ceil(ms / 1000))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
 
 const k = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
 const hit = (u: TurnUse) => {
@@ -15,6 +23,21 @@ const hit = (u: TurnUse) => {
 }
 
 export const register: Register = on => {
+  let timer: { cancel: () => void } | undefined
+
+  on('session.start', async ($, e, next) => {
+    timer?.cancel()
+    timer = $.clock.every(1000, async () => {
+      const at = await read($, lastAt)
+      if (at === 0) return
+      const left = at + TTL_MS[await read($, ttl)] - (await $.clock.now())
+      $.ui.status(left > 0 ? `cache warm ${clock(left)}` : 'cache cold')
+      $.ui.invalidate('ui.render')
+    })
+
+    return next(e)
+  })
+
   on('turn.complete', async ($, e, next) => {
     if (e.usage !== undefined && e.agentId === undefined) {
       const use: TurnUse = {
@@ -24,6 +47,8 @@ export const register: Register = on => {
         write: e.usage.cache_creation_input_tokens,
       }
       await update($, last, () => use)
+      const now = await $.clock.now()
+      await update($, lastAt, () => now)
       await update($, total, sum => ({
         input: sum.input + use.input,
         output: sum.output + use.output,
@@ -41,8 +66,12 @@ export const register: Register = on => {
       return next(e)
     }
     const ui = $.ui.resolve(e)
-    const { Box, Text } = ui
+    const { Box, Button, Text } = ui
     const sum = await read($, total)
+    const span = await read($, ttl)
+    const at = await read($, lastAt)
+    const left = at + TTL_MS[span] - (await $.clock.now())
+    const hasSvg = ui.Svg !== undefined
 
     return (
       <Box gap={2}>
@@ -55,6 +84,18 @@ export const register: Register = on => {
           <Text color="#ffe066">out {k(turn.output)}</Text>{' '}
           <Text color="#7dff9a">cache {hit(turn)}%</Text>
         </Text>
+        <Box gap={1}>
+          {hasSvg && icon(ui, 'timer', left > 0 ? '#7dff9a' : '#9ca3af', '')}
+          <Text color={left > 0 ? 'green' : undefined} dimColor={left <= 0}>
+            {left > 0 ? `cache warm ${clock(left)}` : 'cache cold'}
+          </Text>
+          {(['5m', '1h'] as const).map(one => (
+            <Box gap={1}>
+              {hasSvg && icon(ui, span === one ? 'circle-dot' : 'circle', span === one ? '#7dff9a' : '#9ca3af', '', 12)}
+              <Button key={`ttl-${one}`} label={hasSvg ? one : span === one ? `● ${one}` : `○ ${one}`} onPress={() => update($, ttl, () => one)} />
+            </Box>
+          ))}
+        </Box>
         <Text dimColor>
           session in {k(sum.input + sum.read + sum.write)} · out {k(sum.output)} · cache {hit(sum)}%
         </Text>
