@@ -1,7 +1,6 @@
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-import { icon } from './icons'
 
 const isOn = atom({ plugin: 'hide-sensitive', key: 'isOn' } as const, true)
 const masked = atom({ plugin: 'hide-sensitive', key: 'masked' } as const, 0)
@@ -128,28 +127,16 @@ const view = (segs: Seg[], ui: { Box: any; Button: any; Text: any; Svg?: any }, 
   )
 }
 
-// One chip: the copy icon sits inside the same coloured block as the pressable label,
-// so the two read as a single control. An icon cannot be a Button's child, so the press
-// is the label's; where there is no Svg a glyph stands in.
+// One chip: a single Button, so the whole control (copy glyph included) is the press target.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const chip = (ui: { Box: any; Button: any; Text: any; Svg?: any }, id: string, face: string, label: string, color: string, onPress: (press: { surface: unknown }) => void) => {
-  const { Box, Button, Text } = ui
-  const hasSvg = ui.Svg !== undefined
-  const text = (
-    <Text color={color}>
-      {face}
-      <Text>{label}{hasSvg ? '' : ' ⧉'}</Text>
-    </Text>
-  )
+const chip = (ui: { Button: any; Text: any }, id: string, face: string, label: string, color: string, onPress: (press: { surface: unknown }) => void) => {
+  const { Button, Text } = ui
 
-  return hasSvg ? (
-    <Box backgroundColor="#3b3b3b" paddingX={1} gap={1}>
-      <Button key={id} plain onPress={onPress}>{text}</Button>
-      {icon(ui, 'copy', color, '', 14)}
-    </Box>
-  ) : (
+  return (
     <Button key={id} plain onPress={onPress}>
-      <Text backgroundColor="#3b3b3b">{text}</Text>
+      <Text backgroundColor="#3b3b3b" color={color}>
+        {` ${face}${label} ⧉ `}
+      </Text>
     </Button>
   )
 }

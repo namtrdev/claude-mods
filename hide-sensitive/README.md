@@ -19,4 +19,3 @@ Built for Claude Code mods (hook modules). Nothing here runs outside your machin
 
 MIT, Copyright (c) 2026 Jackie.
 
-Icons: Lucide (ISC). See THIRD_PARTY_NOTICES.md.
