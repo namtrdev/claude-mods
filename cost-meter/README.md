@@ -6,7 +6,7 @@ A band above the prompt that shows token usage for the last turn and the whole s
 
 ```
 /plugin marketplace add namtrdev/claude-mods
-/plugin install cost-meter@my-mods
+/plugin install cost-meter@jackie-mods
 ```
 
 ## Use

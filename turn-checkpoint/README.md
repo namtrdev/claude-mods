@@ -6,7 +6,7 @@ Saves the original of every file a turn edits before it is changed. Use /undo-tu
 
 ```
 /plugin marketplace add namtrdev/claude-mods
-/plugin install turn-checkpoint@my-mods
+/plugin install turn-checkpoint@jackie-mods
 ```
 
 ## Use

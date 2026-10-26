@@ -6,7 +6,7 @@ Masks secrets in tool results, refuses to write keys into source files and block
 
 ```
 /plugin marketplace add namtrdev/claude-mods
-/plugin install secret-guard@my-mods
+/plugin install secret-guard@jackie-mods
 ```
 
 ## Use

@@ -6,7 +6,7 @@ A row of buttons above the prompt that switches reply modes: short, detail, ask-
 
 ```
 /plugin marketplace add namtrdev/claude-mods
-/plugin install reply-modes@my-mods
+/plugin install reply-modes@jackie-mods
 ```
 
 ## Use

@@ -6,7 +6,7 @@ Asks for confirmation before destructive commands such as recursive deletes, for
 
 ```
 /plugin marketplace add namtrdev/claude-mods
-/plugin install danger-guard@my-mods
+/plugin install danger-guard@jackie-mods
 ```
 
 ## Use

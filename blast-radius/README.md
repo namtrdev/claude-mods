@@ -6,7 +6,7 @@ A pane that shows how far this session's changes reach: the files edited, the di
 
 ```
 /plugin marketplace add namtrdev/claude-mods
-/plugin install blast-radius@my-mods
+/plugin install blast-radius@jackie-mods
 ```
 
 ## Use
