@@ -6,15 +6,31 @@ import { icon } from './icons'
 import type { Loaded } from '../types'
 
 const files = atom({ plugin: 'context-files', key: 'files' } as const, [])
+const nested = atom({ plugin: 'context-files', key: 'nested' } as const, [])
 const isExpanded = atom({ plugin: 'context-files', key: 'isExpanded' } as const, true)
 
-const ORDER = ['managed', 'user', 'project', 'local', 'memory']
+const ORDER = ['managed', 'user', 'project', 'local', 'memory', 'nested']
 const COLOR: Record<string, string> = {
   managed: '#ff7a7a',
   user: '#5fe3ff',
   project: '#7dff9a',
   local: '#ffe066',
   memory: '#ff8ae8',
+  nested: '#c4a7ff',
+}
+
+// A nested_memory attachment reads "Contents of <path>:\n\n<text>", one block per file.
+const NESTED_HEAD = /^Contents of (.+?):\n/gm
+
+const parseNested = (text: string): Loaded[] => {
+  const heads = [...text.matchAll(NESTED_HEAD)]
+
+  return heads.map((head, i) => {
+    const start = (head.index ?? 0) + head[0].length
+    const end = i + 1 < heads.length ? (heads[i + 1].index ?? text.length) : text.length
+
+    return { path: head[1], kind: 'nested', chars: Math.max(0, end - start) }
+  })
 }
 
 const tokens = (chars: number) => {
@@ -51,8 +67,23 @@ export const register: Register = (on, options) => {
       parent: one.parent,
     }))
     await update($, files, () => loaded)
+    // prompt.context fires at the start of a conversation and after compaction or /clear;
+    // lazily loaded files are re-attached after that, so start the nested list over.
+    await update($, nested, () => [])
 
     return out
+  })
+
+  on('prompt.attachment', { type: 'nested_memory' }, async ($, e, next) => {
+    const found = parseNested(e.text)
+    if (found.length > 0) {
+      await update($, nested, prev => [
+        ...prev.filter(one => !found.some(f => f.path === one.path)),
+        ...found,
+      ])
+    }
+
+    return next(e)
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -63,7 +94,8 @@ export const register: Register = (on, options) => {
     const ui = $.ui.resolve(e)
     const { Box, Button, Text } = ui
     const hasSvg = ui.Svg !== undefined
-    const [list, open] = [await read($, files), await read($, isExpanded)]
+    const [loaded, lazy, open] = [await read($, files), await read($, nested), await read($, isExpanded)]
+    const list = [...loaded, ...lazy.filter(one => !loaded.some(f => f.path === one.path))]
     const total = list.reduce((sum, one) => sum + one.chars, 0)
     const cols = e.viewport?.columns ?? 80
     const groups = ORDER.map(kind => {

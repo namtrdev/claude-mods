@@ -2,6 +2,6 @@ export type Loaded = { path: string; kind: string; chars: number; parent?: strin
 
 declare module 'claude-code' {
   interface PluginState {
-    'context-files': { files: Loaded[]; isExpanded: boolean }
+    'context-files': { files: Loaded[]; nested: Loaded[]; isExpanded: boolean }
   }
 }

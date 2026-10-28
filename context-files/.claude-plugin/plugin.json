@@ -1,6 +1,6 @@
 {
   "name": "context-files",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Pane listing the CLAUDE.md, memory and other instruction files this session loaded, by tier, with size.",
   "types": "./types/index.d.ts",
   "author": {
