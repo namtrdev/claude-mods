@@ -1,6 +1,6 @@
 # Claude Code mods by Jackie
 
-Nine mods for Claude Code: privacy and safety guards, a replay pane, usage and context bands.
+Ten mods for Claude Code: privacy and safety guards, a replay pane, usage, context and localhost-server bands.
 
 | Mod | What it does |
 |---|---|
@@ -13,6 +13,7 @@ Nine mods for Claude Code: privacy and safety guards, a replay pane, usage and c
 | `danger-guard` | Asks for confirmation before destructive commands such as recursive deletes, force pushes, hard resets, sudo and DROP TABLE, refuses catastrophic ones outright, and asks before writes to sensitive paths like ~/. |
 | `turn-checkpoint` | Saves the original of every file a turn edits before it is changed. |
 | `cost-meter` | A band above the prompt that shows token usage for the last turn and the whole session, including the prompt-cache hit ratio. |
+| `localhost-servers` | A band above the prompt that lists the localhost servers listening now, grouped by the Claude Code session that owns them, with STOP (SIGTERM) and TERMINATE (SIGKILL) buttons on every row. |
 
 ## Install
 

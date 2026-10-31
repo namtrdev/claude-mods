@@ -48,6 +48,11 @@
       "name": "cost-meter",
       "source": "./cost-meter",
       "description": "Token usage and cache hit band"
+    },
+    {
+      "name": "localhost-servers",
+      "source": "./localhost-servers",
+      "description": "Localhost servers by Claude Code session, with STOP and TERMINATE"
     }
   ]
 }

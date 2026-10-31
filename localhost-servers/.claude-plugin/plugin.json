@@ -1,0 +1,14 @@
+{
+  "name": "localhost-servers",
+  "version": "0.1.0",
+  "description": "Band listing the localhost dev servers running now, with the Claude Code session that owns each.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Jackie"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "mod"
+  ]
+}
