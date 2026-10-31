@@ -66,7 +66,7 @@ export const register: Register = (on, options) => {
     const { Box, Button, Text } = ui
     const hasSvg = ui.Svg !== undefined
     const ctl = (key: string, name: IconName, label: string, glyphLabel: string, onPress: () => void) => (
-      <Box gap={1}>
+      <Box gap={1} flexShrink={0}>
         {hasSvg && icon(ui, name, '#9ca3af', '')}
         <Button key={key} label={hasSvg ? label : glyphLabel} onPress={onPress} />
       </Box>
@@ -108,14 +108,16 @@ export const register: Register = (on, options) => {
           const idx = start + i
           const secs = ((one.at - t0) / 1000).toFixed(1).padStart(6)
           return (
-            <Box gap={1}>
+            <Box gap={1} alignItems="flex-start">
               {hasSvg ? (
-                <Box width={2}>{idx === at && icon(ui, 'play', '#ffe066', '', 12)}</Box>
+                <Box width={2} flexShrink={0}>{idx === at && icon(ui, 'play', '#ffe066', '', 12)}</Box>
               ) : (
                 <Text>{idx === at ? '▸' : ' '}</Text>
               )}
               {hasSvg ? (
-                icon(ui, one.isError ? 'x' : 'check', one.isError ? '#ff7a7a' : '#7dff9a', '', 14)
+                <Box width={2} flexShrink={0}>
+                  {icon(ui, one.isError ? 'x' : 'check', one.isError ? '#ff7a7a' : '#7dff9a', '', 14)}
+                </Box>
               ) : (
                 <Text color={one.isError ? 'red' : 'green'}>{one.isError ? '✗' : '✓'}</Text>
               )}
@@ -125,7 +127,7 @@ export const register: Register = (on, options) => {
             </Box>
           )
         })}
-        <Box gap={2}>
+        <Box columnGap={2} rowGap={1} flexWrap="wrap">
           {ctl('back', 'skip-back', 'Back', '◀ Back', () => update($, cursor, n => Math.max(-1, n - 1)))}
           {ctl('play', playing ? 'pause' : 'play', playing ? 'Pause' : 'Play', playing ? 'Pause' : 'Play', play)}
           {ctl('next', 'skip-forward', 'Next', 'Next ▶', () => update($, cursor, n => Math.min(list.length - 1, n + 1)))}
