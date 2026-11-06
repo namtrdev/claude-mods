@@ -25,19 +25,31 @@ const pipesToShell = (command: string) => {
 // deny: no sensible reason to ever do this; ask: legitimate but irreversible.
 // `re` finds the rule's candidate; `also`, when present, must agree too.
 const RULES: { re: RegExp; also?: (command: string) => boolean; verdict: 'ask' | 'deny'; reason: string }[] = [
-  { re: /\brm\s+(-\w*\s+)*-\w*[rf]\w*\s+(-\w+\s+)*(\/|~|\$HOME|\/\*)(\s|$)/, verdict: 'deny', reason: 'recursive delete of root or home' },
+  {
+    re: /\brm\s+(-\w*\s+)*-\w*[rf]\w*\s+(-\w+\s+)*(\/|~|\$HOME|\/\*)(\s|$)/,
+    verdict: 'deny',
+    reason: 'recursive delete of root or home',
+  },
   { re: /:\(\)\s*\{\s*:\|:&\s*\};:/, verdict: 'deny', reason: 'fork bomb' },
   { re: />\s*\/dev\/(sd|nvme|disk)\w*/, verdict: 'deny', reason: 'writes to a raw disk' },
   { re: /\bmkfs\b|\bdd\s+.*\bof=\/dev\//, verdict: 'deny', reason: 'formats or overwrites a disk' },
   { re: /\brm\s+(-\w*\s+)*-\w*[rf]\w*\b/, verdict: 'ask', reason: 'recursive or forced delete' },
   { re: /\bgit\s+push\b.*(--force\b|\s-f\b)/, verdict: 'ask', reason: 'force push rewrites remote history' },
-  { re: /\bgit\s+(reset\s+--hard|clean\s+-\w*f|checkout\s+--\s|restore\s+\.)/, verdict: 'ask', reason: 'discards uncommitted work' },
+  {
+    re: /\bgit\s+(reset\s+--hard|clean\s+-\w*f|checkout\s+--\s|restore\s+\.)/,
+    verdict: 'ask',
+    reason: 'discards uncommitted work',
+  },
   { re: /\bgit\s+branch\s+-D\b/, verdict: 'ask', reason: 'deletes a branch with unmerged work' },
   { re: /\b(curl|wget)\b/, also: pipesToShell, verdict: 'ask', reason: 'runs a remote script' },
   { re: /\bchmod\s+(-R\s+)?[0-7]*777\b/, verdict: 'ask', reason: 'world-writable permissions' },
   { re: /\bsudo\b/, verdict: 'ask', reason: 'runs with root privileges' },
   { re: /\bdrop\s+(table|database|schema)\b|\btruncate\s+table\b/i, verdict: 'ask', reason: 'drops database data' },
-  { re: /\b(kubectl|helm)\s+(delete|uninstall)\b|\bterraform\s+destroy\b/, verdict: 'ask', reason: 'deletes infrastructure' },
+  {
+    re: /\b(kubectl|helm)\s+(delete|uninstall)\b|\bterraform\s+destroy\b/,
+    verdict: 'ask',
+    reason: 'deletes infrastructure',
+  },
 ]
 
 const SENSITIVE_PATH = /(^|\/)(\.ssh|\.aws|\.gnupg|\.kube)\/|(^|\/)\.(bashrc|zshrc|zprofile|profile)$|^\/etc\//
@@ -71,8 +83,10 @@ export const register: Register = (on, options) => {
     if (options.allowSudo === true && rule.reason === 'runs with root privileges') return []
     if (rule.reason === 'force push rewrites remote history' && options.forcePush === 'allow') return []
     if (rule.reason === 'recursive or forced delete' && options.recursiveDelete === 'allow') return []
-    if (rule.reason === 'force push rewrites remote history' && options.forcePush === 'deny') return [{ ...rule, verdict: 'deny' as const }]
-    if (rule.reason === 'recursive or forced delete' && options.recursiveDelete === 'deny') return [{ ...rule, verdict: 'deny' as const }]
+    if (rule.reason === 'force push rewrites remote history' && options.forcePush === 'deny')
+      return [{ ...rule, verdict: 'deny' as const }]
+    if (rule.reason === 'recursive or forced delete' && options.recursiveDelete === 'deny')
+      return [{ ...rule, verdict: 'deny' as const }]
     return [rule]
   })
   const extraCommands = parse(options.extraCommands)

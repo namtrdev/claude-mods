@@ -53,9 +53,7 @@ export const register: Register = (on, options) => {
     await update($, steps, list => [...list, step].slice(-maxSteps))
     const ran = await next(e)
     if (ran.deny !== undefined || ran.isError === true) {
-      await update($, steps, list =>
-        list.map(one => (one.id === step.id ? { ...one, isError: true } : one)),
-      )
+      await update($, steps, list => list.map(one => (one.id === step.id ? { ...one, isError: true } : one)))
     }
 
     return ran
@@ -78,7 +76,9 @@ export const register: Register = (on, options) => {
 
     const play = async () => {
       if (playing) {
-        timer?.cancel(); timer = undefined; await update($, isPlaying, () => false)
+        timer?.cancel()
+        timer = undefined
+        await update($, isPlaying, () => false)
         return
       }
       if (list.length === 0) return
@@ -87,7 +87,8 @@ export const register: Register = (on, options) => {
       timer = $.clock.every(speed, async () => {
         const [all, now] = [await read($, steps), await read($, cursor)]
         if (now >= all.length - 1) {
-          timer?.cancel(); timer = undefined
+          timer?.cancel()
+          timer = undefined
           await update($, isPlaying, () => false)
           return
         }
@@ -100,7 +101,8 @@ export const register: Register = (on, options) => {
         <Box gap={1}>
           {hasSvg && icon(ui, playing ? 'play' : 'pause', playing ? '#7dff9a' : '#9ca3af', '')}
           <Text bold>
-            {hasSvg ? (playing ? 'Playing' : 'Paused') : playing ? '▶ Playing' : '■ Paused'} · step {Math.max(0, at + 1)}/{list.length}
+            {hasSvg ? (playing ? 'Playing' : 'Paused') : playing ? '▶ Playing' : '■ Paused'} · step{' '}
+            {Math.max(0, at + 1)}/{list.length}
           </Text>
         </Box>
         {list.length === 0 && <Text dimColor>Nothing recorded yet.</Text>}
@@ -110,7 +112,9 @@ export const register: Register = (on, options) => {
           return (
             <Box gap={1} alignItems="flex-start">
               {hasSvg ? (
-                <Box width={2} flexShrink={0}>{idx === at && icon(ui, 'play', '#ffe066', '', 12)}</Box>
+                <Box width={2} flexShrink={0}>
+                  {idx === at && icon(ui, 'play', '#ffe066', '', 12)}
+                </Box>
               ) : (
                 <Text>{idx === at ? '▸' : ' '}</Text>
               )}
@@ -130,7 +134,9 @@ export const register: Register = (on, options) => {
         <Box columnGap={2} rowGap={1} flexWrap="wrap">
           {ctl('back', 'skip-back', 'Back', '◀ Back', () => update($, cursor, n => Math.max(-1, n - 1)))}
           {ctl('play', playing ? 'pause' : 'play', playing ? 'Pause' : 'Play', playing ? 'Pause' : 'Play', play)}
-          {ctl('next', 'skip-forward', 'Next', 'Next ▶', () => update($, cursor, n => Math.min(list.length - 1, n + 1)))}
+          {ctl('next', 'skip-forward', 'Next', 'Next ▶', () =>
+            update($, cursor, n => Math.min(list.length - 1, n + 1)),
+          )}
           {ctl('rewind', 'rotate-ccw', 'Rewind', 'Rewind', async () => {
             timer?.cancel()
             timer = undefined

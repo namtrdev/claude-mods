@@ -67,9 +67,7 @@ export const register: Register = (on, options) => {
     }
 
     return {
-      text: list
-        .map(t => `#${t.no} "${t.prompt}": ${t.snaps.map(s => s.path.split('/').pop()).join(', ')}`)
-        .join('\n'),
+      text: list.map(t => `#${t.no} "${t.prompt}": ${t.snaps.map(s => s.path.split('/').pop()).join(', ')}`).join('\n'),
     }
   })
 
@@ -95,7 +93,9 @@ export const register: Register = (on, options) => {
       text: [
         `Undid turn #${target.no} ("${target.prompt}").`,
         `Restored ${restored.length}: ${restored.join(', ') || 'none'}`,
-        created.length > 0 ? `Created by that turn and left in place (delete them yourself): ${created.join(', ')}` : '',
+        created.length > 0
+          ? `Created by that turn and left in place (delete them yourself): ${created.join(', ')}`
+          : '',
       ]
         .filter(Boolean)
         .join('\n'),

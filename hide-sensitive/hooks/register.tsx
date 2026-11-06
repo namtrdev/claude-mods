@@ -1,7 +1,6 @@
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-
 const isOn = atom({ plugin: 'hide-sensitive', key: 'isOn' } as const, true)
 const masked = atom({ plugin: 'hide-sensitive', key: 'masked' } as const, 0)
 
@@ -48,8 +47,20 @@ const isSpace = (c: number) => (c < 128 ? (CLS[c] & F_SPACE) !== 0 : UNICODE_SPA
 const codes = (list: string[]) => list.map(w => Array.from(w, ch => ch.charCodeAt(0)))
 // Names that mark the value after them as a secret.
 const ASSIGN_NAMES = codes([
-  'password', 'passwd', 'pwd', 'secret', 'token',
-  'apikey', 'api_key', 'api-key', 'accesskey', 'access_key', 'access-key', 'privatekey', 'private_key', 'private-key',
+  'password',
+  'passwd',
+  'pwd',
+  'secret',
+  'token',
+  'apikey',
+  'api_key',
+  'api-key',
+  'accesskey',
+  'access_key',
+  'access-key',
+  'privatekey',
+  'private_key',
+  'private-key',
 ])
 // Names that only count when the value also looks random.
 const GENERIC_NAMES = codes(['key', 'credentials', 'credential', 'auth', 'passphrase'])
@@ -253,10 +264,17 @@ const PLACEHOLDER = /\[hidden:([^\]]+)\]/g
 
 type Seg = { plain: string } | { label: string; original?: string }
 
-// Draws segments as rows: plain text as text, each mask as a box that copies its original.
+// The host's UI components have no exported types.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const view = (segs: Seg[], ui: { Box: any; Button: any; Text: any; Markdown?: any; Svg?: any }, copy: (item: { label: string; original?: string }, surface: unknown) => void) => {
-  const { Box, Button, Text } = ui
+type Component = any
+
+// Draws segments as rows: plain text as text, each mask as a box that copies its original.
+const view = (
+  segs: Seg[],
+  ui: { Box: Component; Button: Component; Text: Component; Markdown?: Component; Svg?: Component },
+  copy: (item: { label: string; original?: string }, surface: unknown) => void,
+) => {
+  const { Box, Text } = ui
   const lines: Seg[][] = [[]]
   for (const seg of segs) {
     if ('plain' in seg) {
@@ -279,7 +297,9 @@ const view = (segs: Seg[], ui: { Box: any; Button: any; Text: any; Markdown?: an
             if ('plain' in seg) return <Text>{seg.plain}</Text>
             const id = n
             n += 1
-            const box = chip(ui, `hidden-${id}`, '████████ ', seg.label, '#ffe066', (press: { surface: unknown }) => copy(seg, press.surface))
+            const box = chip(ui, `hidden-${id}`, '████████ ', seg.label, '#ffe066', (press: { surface: unknown }) =>
+              copy(seg, press.surface),
+            )
             // A masked URL is itself the link to its original, which the surface opens on a press;
             // a small button beside it copies. Fixed width, as Markdown otherwise fills the row.
             if (seg.label.startsWith('url') && seg.original !== undefined && ui.Markdown !== undefined) {
@@ -311,8 +331,14 @@ const view = (segs: Seg[], ui: { Box: any; Button: any; Text: any; Markdown?: an
 }
 
 // One chip: a single Button, so the whole control (copy glyph included) is the press target.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const chip = (ui: { Button: any; Text: any }, id: string, face: string, label: string, color: string, onPress: (press: { surface: unknown }) => void) => {
+const chip = (
+  ui: { Button: Component; Text: Component },
+  id: string,
+  face: string,
+  label: string,
+  color: string,
+  onPress: (press: { surface: unknown }) => void,
+) => {
   const { Button, Text } = ui
 
   return (
@@ -392,7 +418,8 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'UserMessage' }, async ($, e, next) => {
     // The row carries the prompt as typed, so the secrets are still in it: box them on screen.
-    const typed = (await read($, isOn)) && ['composer', 'sdk', 'bridge'].includes(e.props.origin.kind) ? find(e.props.text) : []
+    const typed =
+      (await read($, isOn)) && ['composer', 'sdk', 'bridge'].includes(e.props.origin.kind) ? find(e.props.text) : []
     if (typed.length > 0) {
       const segs: Seg[] = []
       let from = 0
@@ -451,8 +478,7 @@ export const register: Register = (on, options) => {
     }
 
     const ui = $.ui.resolve(e)
-    const { Box, Button, Markdown, Text } = ui
-    const hasSvg = ui.Svg !== undefined
+    const { Box, Markdown, Text } = ui
 
     // Blocks split at blank lines outside code fences, so each keeps its own markdown.
     const blocks: string[] = []
@@ -497,11 +523,11 @@ export const register: Register = (on, options) => {
               <Box flexDirection="column" borderStyle="round" paddingX={1}>
                 <Box justifyContent="space-between">
                   <Text dimColor>{lang === '' ? 'code' : lang}</Text>
-                  {chip(ui, `code-${b}`, '', 'Copy (original)', '#7dff9a', press => copy(body, 'original code', press.surface as typeof e.surface))}
+                  {chip(ui, `code-${b}`, '', 'Copy (original)', '#7dff9a', press =>
+                    copy(body, 'original code', press.surface as typeof e.surface),
+                  )}
                 </Box>
-                {view(segs, ui, (item, surface) =>
-                  copy(item.original ?? '', item.label, surface as typeof e.surface),
-                )}
+                {view(segs, ui, (item, surface) => copy(item.original ?? '', item.label, surface as typeof e.surface))}
               </Box>
             )
           }
@@ -519,8 +545,7 @@ export const register: Register = (on, options) => {
             // Other masks get a link that copies the original; code shows links as raw text.
             const asLinkTarget = isUrl && /\]\($/.test(before)
             shown +=
-              before +
-              (asLinkTarget ? hit.original : inCode ? face : `[${face}](${isUrl ? hit.original : hrefs[i]})`)
+              before + (asLinkTarget ? hit.original : inCode ? face : `[${face}](${isUrl ? hit.original : hrefs[i]})`)
             at = hit.end
           })
           shown += block.slice(at)
@@ -539,12 +564,12 @@ export const register: Register = (on, options) => {
                 }}
               />
               <Box gap={1} flexWrap="wrap">
-                {hits.map((hit, i) => (
+                {hits.map((hit, i) =>
                   chip(ui, `hidden-${b}-${i}`, '████████ ', hit.label, '#ffe066', async press => {
                     const done = await $.ui.copy({ text: hit.original, surface: press.surface as typeof e.surface })
                     $.ui.toast(done.isCopied ? `Copied ${hit.label}` : 'Could not copy')
-                  })
-                ))}
+                  }),
+                )}
               </Box>
             </Box>
           )

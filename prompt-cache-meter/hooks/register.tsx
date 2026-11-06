@@ -78,7 +78,16 @@ export const register: Register = (on, options) => {
     const ui = $.ui.resolve(e)
     const { Box, Button, Text } = ui
     const rest = await next(e)
-    const stack = (band: unknown) => (rest && rest.type !== 'engine' ? <Box flexDirection="column" gap={2}>{rest}<Box height={0.1} backgroundColor="#3a3f4b" />{band}</Box> : band)
+    const stack = (band: unknown) =>
+      rest && rest.type !== 'engine' ? (
+        <Box flexDirection="column" gap={2}>
+          {rest}
+          <Box height={0.1} backgroundColor="#3a3f4b" />
+          {band}
+        </Box>
+      ) : (
+        band
+      )
     const before = await read($, prev)
     const sum = await read($, total)
     const span = await read($, ttl)
@@ -98,35 +107,41 @@ export const register: Register = (on, options) => {
           </Box>
           <Text>
             turn <Text color="#5fe3ff">in {k(turn.input + turn.read + turn.write)}</Text>{' '}
-            <Text color="#ffe066">out {k(turn.output)}</Text>{' '}
-            <Text color="#7dff9a">cache {hit(turn)}%</Text>
+            <Text color="#ffe066">out {k(turn.output)}</Text> <Text color="#7dff9a">cache {hit(turn)}%</Text>
           </Text>
           <Text dimColor>
             session in {k(sum.input + sum.read + sum.write)} · out {k(sum.output)} · cache {hit(sum)}%
           </Text>
           {dropped && before !== null && (
-            <Text color="yellow">cache dropped {hit(before)}% → {hit(turn)}%: prefix changed or expired</Text>
+            <Text color="yellow">
+              cache dropped {hit(before)}% → {hit(turn)}%: prefix changed or expired
+            </Text>
           )}
         </Box>
         {options.showCacheClock !== false && (
-        <Box gap={2}>
-          <Box gap={1}>
-            {hasSvg && icon(ui, 'timer', left > 0 ? '#7dff9a' : '#9ca3af', '')}
-            <Text color={expiring ? 'yellow' : left > 0 ? 'green' : undefined} dimColor={left <= 0}>
-              {left > 0 ? `cache warm ${clock(left)}` : 'cache cold'}
-            </Text>
-            {expiring && <Text color="yellow">expires soon: send a message to keep it warm</Text>}
-          </Box>
-          <Text dimColor>Cache TTL:</Text>
-          {(['5m', '1h'] as const).map(one => (
+          <Box gap={2}>
             <Box gap={1}>
-              {hasSvg && icon(ui, span === one ? 'circle-dot' : 'circle', span === one ? '#7dff9a' : '#9ca3af', '', 12)}
-              <Button key={`ttl-${one}`} label={hasSvg ? NAME[one] : span === one ? `● ${NAME[one]}` : `○ ${NAME[one]}`} onPress={() => update($, ttl, () => one)} />
+              {hasSvg && icon(ui, 'timer', left > 0 ? '#7dff9a' : '#9ca3af', '')}
+              <Text color={expiring ? 'yellow' : left > 0 ? 'green' : undefined} dimColor={left <= 0}>
+                {left > 0 ? `cache warm ${clock(left)}` : 'cache cold'}
+              </Text>
+              {expiring && <Text color="yellow">expires soon: send a message to keep it warm</Text>}
             </Box>
-          ))}
-        </Box>
+            <Text dimColor>Cache TTL:</Text>
+            {(['5m', '1h'] as const).map(one => (
+              <Box gap={1}>
+                {hasSvg &&
+                  icon(ui, span === one ? 'circle-dot' : 'circle', span === one ? '#7dff9a' : '#9ca3af', '', 12)}
+                <Button
+                  key={`ttl-${one}`}
+                  label={hasSvg ? NAME[one] : span === one ? `● ${NAME[one]}` : `○ ${NAME[one]}`}
+                  onPress={() => update($, ttl, () => one)}
+                />
+              </Box>
+            ))}
+          </Box>
         )}
-      </Box>
+      </Box>,
     )
   })
 }

@@ -29,8 +29,7 @@ const filePath = (e: object): string | undefined => {
   return typeof path === 'string' ? path : undefined
 }
 
-const score = (files: Touch[], bad: Risky[]) =>
-  files.length + bad.reduce((sum, one) => sum + one.weight, 0)
+const score = (files: Touch[], bad: Risky[]) => files.length + bad.reduce((sum, one) => sum + one.weight, 0)
 
 const level = (n: number) => (n >= 15 ? 'HIGH' : n >= 6 ? 'MEDIUM' : 'LOW')
 
@@ -84,9 +83,7 @@ export const register: Register = (on, options) => {
     } else if (e.tool === 'Bash') {
       const command = String((e as Record<string, unknown>).command ?? '')
       await update($, commands, n => n + 1)
-      const rule = [...RULES, ...extraRules].filter(r => r.re.test(command)).sort(
-        (a, b) => b.weight - a.weight,
-      )[0]
+      const rule = [...RULES, ...extraRules].filter(r => r.re.test(command)).sort((a, b) => b.weight - a.weight)[0]
       if (rule !== undefined) {
         await update($, risky, list =>
           [...list, { command: command.slice(0, 120), reason: rule.reason, weight: rule.weight }].slice(-50),
@@ -141,16 +138,16 @@ export const register: Register = (on, options) => {
         ))}
         <Box gap={1}>
           {hasSvg && icon(ui, 'rotate-ccw', '#9ca3af', '')}
-        <Button
-          key="reset"
-          label="Reset"
-          onPress={async () => {
-            await update($, touched, () => [])
-            await update($, risky, () => [])
-            await update($, commands, () => 0)
-            $.ui.status(undefined)
-          }}
-        />
+          <Button
+            key="reset"
+            label="Reset"
+            onPress={async () => {
+              await update($, touched, () => [])
+              await update($, risky, () => [])
+              await update($, commands, () => 0)
+              $.ui.status(undefined)
+            }}
+          />
         </Box>
       </Box>
     )

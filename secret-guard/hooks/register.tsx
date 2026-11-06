@@ -34,8 +34,20 @@ const isSpace = (c: number) => (c < 128 ? (CLS[c] & F_SPACE) !== 0 : UNICODE_SPA
 const codes = (list: string[]) => list.map(w => Array.from(w, ch => ch.charCodeAt(0)))
 // Names that mark the value after them as a secret.
 const ASSIGN_NAMES = codes([
-  'password', 'passwd', 'pwd', 'secret', 'token',
-  'apikey', 'api_key', 'api-key', 'accesskey', 'access_key', 'access-key', 'privatekey', 'private_key', 'private-key',
+  'password',
+  'passwd',
+  'pwd',
+  'secret',
+  'token',
+  'apikey',
+  'api_key',
+  'api-key',
+  'accesskey',
+  'access_key',
+  'access-key',
+  'privatekey',
+  'private_key',
+  'private-key',
 ])
 // Names that only count when the value also looks random.
 const GENERIC_NAMES = codes(['key', 'credentials', 'credential', 'auth', 'passphrase'])
@@ -205,9 +217,7 @@ const deepMask = (value: unknown, tally: { n: number }): unknown => {
   if (typeof value === 'string') return maskText(value, tally)
   if (Array.isArray(value)) return value.map(one => deepMask(one, tally))
   if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, deepMask(v, tally)]),
-    )
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, deepMask(v, tally)]))
   }
   return value
 }
@@ -297,8 +307,6 @@ export const register: Register = (on, options) => {
     await update($, masked, n => n + tally.n)
     $.ui.toast(`secret-guard hid ${tally.n} secret${tally.n > 1 ? 's' : ''} in ${e.tool} output`)
 
-    return ran.context === undefined
-      ? { result: clean as never }
-      : { result: clean as never, context: ran.context }
+    return ran.context === undefined ? { result: clean as never } : { result: clean as never, context: ran.context }
   })
 }

@@ -11,15 +11,33 @@ const BASE_MODES: { name: ModeName; label: string; note: string }[] = [
   { name: 'fast', label: 'Fast', note: 'Bỏ qua giai đoạn suy luận, trả lời hoặc làm ngay.' },
   { name: 'short', label: 'Short', note: 'Trả lời tối đa 3 câu.' },
   { name: 'detail', label: 'Detail', note: 'Trả lời đầy đủ, có lập luận và ví dụ.' },
-  { name: 'ask-me', label: 'Ask me', note: 'Dùng coaching: đặt câu hỏi giúp tôi tự làm rõ vấn đề, chưa đưa đáp án ngay.' },
+  {
+    name: 'ask-me',
+    label: 'Ask me',
+    note: 'Dùng coaching: đặt câu hỏi giúp tôi tự làm rõ vấn đề, chưa đưa đáp án ngay.',
+  },
   { name: 'critique', label: 'Critique', note: 'Chỉ nêu rủi ro, điểm yếu và phương án thay thế.' },
 ]
 
-const ICON = { short: 'zap', detail: 'list', 'ask-me': 'circle-help', critique: 'shield-alert', fast: 'fast-forward', off: 'circle' } as const
+const ICON = {
+  'short': 'zap',
+  'detail': 'list',
+  'ask-me': 'circle-help',
+  'critique': 'shield-alert',
+  'fast': 'fast-forward',
+  'off': 'circle',
+} as const
 
 export const register: Register = (on, options) => {
   const MODES = BASE_MODES.map(one => {
-    const key = { short: 'shortNote', detail: 'detailNote', 'ask-me': 'askMeNote', critique: 'critiqueNote', fast: 'fastNote', off: '' }[one.name]
+    const key = {
+      'short': 'shortNote',
+      'detail': 'detailNote',
+      'ask-me': 'askMeNote',
+      'critique': 'critiqueNote',
+      'fast': 'fastNote',
+      'off': '',
+    }[one.name]
     const custom = key === '' ? undefined : options[key]
 
     return typeof custom === 'string' && custom.trim() !== '' ? { ...one, note: custom } : one
@@ -65,7 +83,16 @@ export const register: Register = (on, options) => {
     const ui = $.ui.resolve(e)
     const { Box, Button, Text } = ui
     const rest = await next(e)
-    const stack = (band: unknown) => (rest && rest.type !== 'engine' ? <Box flexDirection="column" gap={2}>{rest}<Box height={0.1} backgroundColor="#3a3f4b" />{band}</Box> : band)
+    const stack = (band: unknown) =>
+      rest && rest.type !== 'engine' ? (
+        <Box flexDirection="column" gap={2}>
+          {rest}
+          <Box height={0.1} backgroundColor="#3a3f4b" />
+          {band}
+        </Box>
+      ) : (
+        band
+      )
     const hasSvg = ui.Svg !== undefined
     const current = await read($, mode)
 
@@ -82,7 +109,7 @@ export const register: Register = (on, options) => {
             />
           </Box>
         ))}
-      </Box>
+      </Box>,
     )
   })
 }

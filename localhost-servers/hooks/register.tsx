@@ -106,7 +106,7 @@ const COLS = [
   { name: 'RAM', width: 10 },
 ]
 
-export const register: Register = (on, options) => {
+export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'localhost-servers',
@@ -158,7 +158,9 @@ export const register: Register = (on, options) => {
           if (!f.name.endsWith('.json') || now - f.mtimeMs > FRESH_MS) continue
           try {
             sessions.push(JSON.parse(await $.fs.read(`${dir}/${f.name}`)))
-          } catch {}
+          } catch {
+            // A session file that cannot be read or parsed is skipped.
+          }
         }
         const owner = (path: string) =>
           sessions
@@ -211,7 +213,16 @@ export const register: Register = (on, options) => {
 
     const { Box, Button, Text } = $.ui.resolve(e)
     const rest = await next(e)
-    const stack = (band: unknown) => (rest && rest.type !== 'engine' ? <Box flexDirection="column" gap={2}>{rest}<Box height={0.1} backgroundColor="#3a3f4b" />{band}</Box> : band)
+    const stack = (band: unknown) =>
+      rest && rest.type !== 'engine' ? (
+        <Box flexDirection="column" gap={2}>
+          {rest}
+          <Box height={0.1} backgroundColor="#3a3f4b" />
+          {band}
+        </Box>
+      ) : (
+        band
+      )
     const [list, open, load] = [await read($, servers), await read($, isExpanded), await read($, sys)]
     const summary = list.length === 0 ? 'no servers listening' : `${list.length} listening`
     const stats = `CPU ${Math.round(load.cpu)}% · RAM ${load.ramUsed.toFixed(1)}/${load.ramTotal.toFixed(0)} GB · GPU ${
@@ -234,7 +245,7 @@ export const register: Register = (on, options) => {
           <Text dimColor>{summary}</Text>
           <Text dimColor>{stats}</Text>
           <Text color="#7dff9a">{list.map(s => `:${s.port}`).join(' ')}</Text>
-        </Box>
+        </Box>,
       )
     }
 
@@ -249,56 +260,60 @@ export const register: Register = (on, options) => {
           <Text dimColor>{stats}</Text>
         </Box>
         <Box flexDirection="column" gap={4}>
-        {sessions.map(id => {
-          const group = list.filter(s => (s.session ?? '') === id)
-          return (
-            <Box key={id} flexDirection="column">
-              <Box paddingBottom={2}>
-              <Text bold color="#5fe3ff">
-                {`Session | ${id === '' ? 'none' : id} | ${shortPath(group[0]?.cwd ?? '')}`}
-              </Text>
-              </Box>
-              <Box paddingBottom={1}>
-                {COLS.map(c => (
-                  <Box key={c.name} width={c.width} flexShrink={0}>
-                    <Text dimColor bold>{c.name}</Text>
-                  </Box>
-                ))}
-                <Text dimColor bold>ACTION</Text>
-              </Box>
-              <Box flexDirection="column" gap={1}>
-              {group.map(s => (
-                <Box key={`${s.pid}:${s.port}`} alignItems="center" hover={{ backgroundColor: '#2b3140' }}>
-                  <Box width={COLS[0]!.width} flexShrink={0}>
-                    <Text bold color={s.scope === 'local' ? '#7dff9a' : '#ffe066'}>{`:${s.port}`}</Text>
-                  </Box>
-                  <Box width={COLS[1]!.width} flexShrink={0}>
-                    <Text>{clip(label(s.cmd), COLS[1]!.width - 1)}</Text>
-                  </Box>
-                  <Box width={COLS[2]!.width} flexShrink={0}>
-                    <Text>{String(s.pid)}</Text>
-                  </Box>
-                  <Box width={COLS[3]!.width} flexShrink={0}>
-                    <Text>{s.up}</Text>
-                  </Box>
-                  <Box width={COLS[4]!.width} flexShrink={0}>
-                    <Text>{`${s.cpu.toFixed(1)}%`}</Text>
-                  </Box>
-                  <Box width={COLS[5]!.width} flexShrink={0}>
-                    <Text>{s.mem >= 1024 ? `${(s.mem / 1024).toFixed(1)} GB` : `${Math.round(s.mem)} MB`}</Text>
-                  </Box>
-                  <Box gap={1}>
-                    <Button key={`stop:${s.pid}`} label="STOP" onPress={() => signal($, s, 'TERM')} />
-                    <Button key={`kill:${s.pid}`} label="TERMINATE" onPress={() => signal($, s, 'KILL')} />
-                  </Box>
+          {sessions.map(id => {
+            const group = list.filter(s => (s.session ?? '') === id)
+            return (
+              <Box key={id} flexDirection="column">
+                <Box paddingBottom={2}>
+                  <Text bold color="#5fe3ff">
+                    {`Session | ${id === '' ? 'none' : id} | ${shortPath(group[0]?.cwd ?? '')}`}
+                  </Text>
                 </Box>
-              ))}
+                <Box paddingBottom={1}>
+                  {COLS.map(c => (
+                    <Box key={c.name} width={c.width} flexShrink={0}>
+                      <Text dimColor bold>
+                        {c.name}
+                      </Text>
+                    </Box>
+                  ))}
+                  <Text dimColor bold>
+                    ACTION
+                  </Text>
+                </Box>
+                <Box flexDirection="column" gap={1}>
+                  {group.map(s => (
+                    <Box key={`${s.pid}:${s.port}`} alignItems="center" hover={{ backgroundColor: '#2b3140' }}>
+                      <Box width={COLS[0]!.width} flexShrink={0}>
+                        <Text bold color={s.scope === 'local' ? '#7dff9a' : '#ffe066'}>{`:${s.port}`}</Text>
+                      </Box>
+                      <Box width={COLS[1]!.width} flexShrink={0}>
+                        <Text>{clip(label(s.cmd), COLS[1]!.width - 1)}</Text>
+                      </Box>
+                      <Box width={COLS[2]!.width} flexShrink={0}>
+                        <Text>{String(s.pid)}</Text>
+                      </Box>
+                      <Box width={COLS[3]!.width} flexShrink={0}>
+                        <Text>{s.up}</Text>
+                      </Box>
+                      <Box width={COLS[4]!.width} flexShrink={0}>
+                        <Text>{`${s.cpu.toFixed(1)}%`}</Text>
+                      </Box>
+                      <Box width={COLS[5]!.width} flexShrink={0}>
+                        <Text>{s.mem >= 1024 ? `${(s.mem / 1024).toFixed(1)} GB` : `${Math.round(s.mem)} MB`}</Text>
+                      </Box>
+                      <Box gap={1}>
+                        <Button key={`stop:${s.pid}`} label="STOP" onPress={() => signal($, s, 'TERM')} />
+                        <Button key={`kill:${s.pid}`} label="TERMINATE" onPress={() => signal($, s, 'KILL')} />
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
               </Box>
-            </Box>
-          )
-        })}
+            )
+          })}
         </Box>
-      </Box>
+      </Box>,
     )
   })
 }

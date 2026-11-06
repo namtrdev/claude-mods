@@ -60,12 +60,19 @@ export const register: Register = (on, options) => {
   on('prompt.context', async ($, e, next) => {
     const out = await next(e)
     const list = out.instructionFiles ?? e.instructionFiles ?? []
-    const loaded: Loaded[] = [...new Map(list.map(one => [one.path, {
-      path: one.path,
-      kind: one.kind,
-      chars: one.content.length,
-      parent: one.parent,
-    }])).values()]
+    const loaded: Loaded[] = [
+      ...new Map(
+        list.map(one => [
+          one.path,
+          {
+            path: one.path,
+            kind: one.kind,
+            chars: one.content.length,
+            parent: one.parent,
+          },
+        ]),
+      ).values(),
+    ]
     await update($, files, () => loaded)
     // prompt.context fires at the start of a conversation and after compaction or /clear;
     // lazily loaded files are re-attached after that, so start the nested list over.
@@ -77,10 +84,7 @@ export const register: Register = (on, options) => {
   on('prompt.attachment', { type: 'nested_memory' }, async ($, e, next) => {
     const found = parseNested(e.text)
     if (found.length > 0) {
-      await update($, nested, prev => [
-        ...prev.filter(one => !found.some(f => f.path === one.path)),
-        ...found,
-      ])
+      await update($, nested, prev => [...prev.filter(one => !found.some(f => f.path === one.path)), ...found])
     }
 
     return next(e)
@@ -94,7 +98,16 @@ export const register: Register = (on, options) => {
     const ui = $.ui.resolve(e)
     const { Box, Button, Text } = ui
     const rest = await next(e)
-    const stack = (band: unknown) => (rest && rest.type !== 'engine' ? <Box flexDirection="column" gap={2}>{rest}<Box height={0.1} backgroundColor="#3a3f4b" />{band}</Box> : band)
+    const stack = (band: unknown) =>
+      rest && rest.type !== 'engine' ? (
+        <Box flexDirection="column" gap={2}>
+          {rest}
+          <Box height={0.1} backgroundColor="#3a3f4b" />
+          {band}
+        </Box>
+      ) : (
+        band
+      )
     const hasSvg = ui.Svg !== undefined
     const [loaded, lazy, open] = [await read($, files), await read($, nested), await read($, isExpanded)]
     const list = [...loaded, ...lazy.filter(one => !loaded.some(f => f.path === one.path))]
@@ -105,12 +118,9 @@ export const register: Register = (on, options) => {
       return { kind, count: group.length, chars: group.reduce((a, one) => a + one.chars, 0) }
     }).filter(one => one.count > 0)
     const pct = (part: number) => (total === 0 ? 0 : Math.round((part / total) * 100))
-    const cells = (part: number, width: number) =>
-      total === 0 ? 0 : Math.max(1, Math.round((part / total) * width))
+    const cells = (part: number, width: number) => (total === 0 ? 0 : Math.max(1, Math.round((part / total) * width)))
     const stacked = (width: number) =>
-      groups.map(one => (
-        <Text color={COLOR[one.kind]}>{'▓'.repeat(cells(one.chars, width))}</Text>
-      ))
+      groups.map(one => <Text color={COLOR[one.kind]}>{'▓'.repeat(cells(one.chars, width))}</Text>)
     const summary =
       list.length === 0 ? 'no instruction files loaded yet' : `${list.length} files · ~${tokens(total)} tok`
 
@@ -132,7 +142,7 @@ export const register: Register = (on, options) => {
           <Text bold>CONTEXT</Text>
           <Text dimColor>{summary}</Text>
           <Box>{stacked(Math.max(8, Math.min(24, cols - 50)))}</Box>
-        </Box>
+        </Box>,
       )
     }
 
@@ -187,7 +197,7 @@ export const register: Register = (on, options) => {
               })}
           </Box>
         ))}
-      </Box>
+      </Box>,
     )
   })
 }
