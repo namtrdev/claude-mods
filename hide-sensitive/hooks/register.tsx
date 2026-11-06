@@ -4,8 +4,8 @@ import type { Register } from 'claude-code'
 const isOn = atom({ plugin: 'hide-sensitive', key: 'isOn' } as const, true)
 const masked = atom({ plugin: 'hide-sensitive', key: 'masked' } as const, 0)
 
-const RULES: { label: string; re: RegExp }[] = [
-  { label: 'private-key', re: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g },
+const RULES: { label: string; re?: RegExp; scan?: (text: string) => [number, number][] }[] = [
+  { label: 'private-key', scan: text => scanPem(text) },
   { label: 'anthropic-key', re: /\bsk-ant-[A-Za-z0-9_-]{20,}/g },
   { label: 'api-key', re: /\bsk-[A-Za-z0-9_-]{20,}/g },
   { label: 'github-token', re: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}|\bgithub_pat_[A-Za-z0-9_]{30,}/g },
@@ -22,9 +22,9 @@ const RULES: { label: string; re: RegExp }[] = [
   { label: 'digitalocean-token', re: /\bdo[opr]_v1_[a-f0-9]{64}\b/g },
   { label: 'twilio-key', re: /\bSK[0-9a-f]{32}\b/g },
   { label: 'docker-token', re: /\bdckr_pat_[A-Za-z0-9_-]{20,}/g },
-  { label: 'jwt', re: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g },
+  { label: 'jwt', scan: text => scanJwt(text) },
   { label: 'bearer-token', re: /\bBearer\s+[A-Za-z0-9._~+/=-]{16,}/g },
-  { label: 'email', re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g },
+  { label: 'email', scan: text => scanEmails(text) },
 ]
 
 // Keyed secrets: `name = value` where the name says "secret".
@@ -231,7 +231,8 @@ const scanUrlSecrets = (text: string, out: [number, number][]) => {
       e++
     }
     // The userinfo ends at the last `@` before the path, so a secret that itself holds an `@` is masked whole.
-    const at = text.lastIndexOf('@', e - 1)
+    let at = e - 1
+    while (at > v && text.charCodeAt(at) !== 64) at--
     if (at > v && !isPlaceholder(text, v, at)) out.push([v, at])
   }
 }
@@ -250,6 +251,147 @@ const scanPartial = (text: string): [number, number][] => {
   const out: [number, number][] = []
   for (const r of found) {
     if (out.length === 0 || r[0] >= out[out.length - 1][1]) out.push(r)
+  }
+  return out
+}
+
+// Detectors that start from a rare anchor instead of trying a regex at every position. A regex such as
+// `\beyJ[...]{8,}\.` restarts at each character of a long run, so input like "-eyJaaaaaaa-eyJaaaaaaa…" took quadratic
+// time (400 KB: 9 s). These find the same matches as the regex in linear time, checked against it on random text.
+type Span = [number, number]
+const isTokenChar = (c: number) => isWordChar(c) || c === 45
+
+// A JWT is `eyJ` + three runs of token characters joined by dots. The runs are scanned once and shared by every
+// `eyJ` that falls inside them.
+const scanJwt = (text: string): Span[] => {
+  const out: Span[] = []
+  const n = text.length
+  const run = (from: number) => {
+    let e = from
+    while (e < n && isTokenChar(text.charCodeAt(e))) e++
+    return e
+  }
+  let runFrom = -1
+  let runTo = -1
+  let memoDot = -1
+  let memoEnd = -1
+  for (let p = text.indexOf('eyJ'); p >= 0;) {
+    if (p > 0 && isWordChar(text.charCodeAt(p - 1))) {
+      p = text.indexOf('eyJ', p + 1)
+      continue
+    }
+    const a = p + 3
+    let dot1: number
+    if (a >= runFrom && a <= runTo) {
+      dot1 = runTo
+    } else {
+      dot1 = run(a)
+      runFrom = a
+      runTo = dot1
+    }
+    if (dot1 - a >= 8 && text.charCodeAt(dot1) === 46) {
+      let end: number
+      if (dot1 === memoDot) {
+        end = memoEnd
+      } else {
+        const dot2 = run(dot1 + 1)
+        end = -1
+        if (dot2 - (dot1 + 1) >= 8 && text.charCodeAt(dot2) === 46) {
+          const last = run(dot2 + 1)
+          if (last - (dot2 + 1) >= 8) end = last
+        }
+        memoDot = dot1
+        memoEnd = end
+      }
+      if (end >= 0) {
+        out.push([p, end])
+        p = text.indexOf('eyJ', end)
+        continue
+      }
+    }
+    p = text.indexOf('eyJ', p + 1)
+  }
+  return out
+}
+
+// A private key block needs an END header after its BEGIN header. Cut the text after the last END header, so a
+// BEGIN with no END anywhere after it is never scanned to the end of the text.
+const PEM = /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g
+const PEM_END = /-----END [A-Z ]*PRIVATE KEY-----/y
+
+const scanPem = (text: string): Span[] => {
+  let cut = -1
+  for (
+    let stop = text.lastIndexOf('-----END ');
+    stop >= 0;
+    stop = stop === 0 ? -1 : text.lastIndexOf('-----END ', stop - 1)
+  ) {
+    PEM_END.lastIndex = stop
+    const m = PEM_END.exec(text)
+    if (m !== null) {
+      cut = stop + m[0].length
+      break
+    }
+  }
+  if (cut < 0) return []
+  return [...text.slice(0, cut).matchAll(PEM)].map(m => [m.index!, m.index! + m[0].length] as Span)
+}
+
+const isLocalChar = (c: number) => isWordChar(c) || c === 46 || c === 37 || c === 43 || c === 45
+const EMAIL_DOMAIN = /[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/y
+
+// An email is found from its `@`: take the run of local-part characters before it, then match the domain after it.
+// The start is the first position where a word boundary holds, as in `\b[A-Za-z0-9._%+-]+@…`.
+const scanEmails = (text: string): Span[] => {
+  const out: Span[] = []
+  let from = 0
+  for (let at = text.indexOf('@'); at >= 0;) {
+    let s = at
+    while (s > from && isLocalChar(text.charCodeAt(s - 1))) s--
+    let r = s
+    while (
+      r < at &&
+      (r === 0
+        ? !isWordChar(text.charCodeAt(r))
+        : isWordChar(text.charCodeAt(r - 1)) === isWordChar(text.charCodeAt(r)))
+    )
+      r++
+    if (r < at) {
+      EMAIL_DOMAIN.lastIndex = at + 1
+      const m = EMAIL_DOMAIN.exec(text)
+      if (m !== null) {
+        const end = at + 1 + m[0].length
+        out.push([r, end])
+        from = end
+        at = text.indexOf('@', end)
+        continue
+      }
+    }
+    at = text.indexOf('@', at + 1)
+  }
+  return out
+}
+
+// A phone number starts with `+`, or with `0` and one of 3 5 7 8 9 (mask 936). The regex only runs at those places.
+const scanPhones = (text: string): Span[] => {
+  const out: Span[] = []
+  const n = text.length
+  for (let i = 0; i < n; i++) {
+    const c = text.charCodeAt(i)
+    if (
+      c === 43 ||
+      (c === 48 &&
+        i + 1 < n &&
+        (text.charCodeAt(i + 1) - 48) >>> 0 < 10 &&
+        ((936 >> (text.charCodeAt(i + 1) - 48)) & 1) === 1)
+    ) {
+      PHONE.lastIndex = i
+      const m = PHONE.exec(text)
+      if (m !== null) {
+        out.push([i, i + m[0].length])
+        i += m[0].length - 1
+      }
+    }
   }
   return out
 }
@@ -313,7 +455,7 @@ const scanKeyed = (text: string, generic: boolean): [number, number][] => {
 }
 
 // Strict phone shapes only: +<country code> numbers and Vietnamese mobile numbers (03/05/07/08/09).
-const PHONE = /(?<![\w+])(?:\+\d{1,3}[ .-]?\d{1,4}(?:[ .-]?\d{2,4}){2,4}|0[35789](?:[ .-]?\d){8})(?![\w])/g
+const PHONE = /(?<![\w+])(?:\+\d{1,3}[ .-]?\d{1,4}(?:[ .-]?\d{2,4}){2,4}|0[35789](?:[ .-]?\d){8})(?![\w])/y
 
 const CARD = /\b(?:\d[ -]?){13,19}\b/g
 
@@ -348,7 +490,14 @@ const find = (text: string): Hit[] => {
     }
   }
   for (const rule of RULES) {
-    if (rule.label === 'email' ? cfg.email : cfg.keys) add(rule.re, rule.label)
+    if (rule.label === 'email' ? cfg.email : cfg.keys) {
+      if (rule.scan !== undefined) {
+        for (const [start, end] of rule.scan(text))
+          hits.push({ start, end, label: rule.label, original: text.slice(start, end) })
+      } else {
+        add(rule.re!, rule.label)
+      }
+    }
   }
   if (cfg.keys) {
     for (const generic of [false, true]) {
@@ -361,7 +510,10 @@ const find = (text: string): Hit[] => {
     }
   }
   if (cfg.card) add(CARD, 'card', isCard)
-  if (cfg.phone) add(PHONE, 'phone')
+  if (cfg.phone) {
+    for (const [start, end] of scanPhones(text))
+      hits.push({ start, end, label: 'phone', original: text.slice(start, end) })
+  }
   for (const re of cfg.extra) add(re, 'custom')
   hits.sort((a, b) => a.start - b.start || b.end - a.end)
   const kept: Hit[] = []
@@ -371,13 +523,15 @@ const find = (text: string): Hit[] => {
   // A secret inside a URL masks the whole URL, so copying gives back the real link.
   const urls = [...text.matchAll(/https?:\/\/[^\s)>\]"'`]+/g)]
   const out: Hit[] = []
+  let next = 0 // hits come in start order and URLs never overlap, so one pointer walks both lists
   for (const hit of kept) {
     // A hit that starts inside a URL belongs to it, even when the hit runs on past the URL's end
     // (the value then swallows the `)` that closes a markdown link).
-    const url = urls.find(u => u.index! <= hit.start && hit.start < u.index! + u[0].length)
+    while (next < urls.length && urls[next].index! + urls[next][0].length <= hit.start) next++
+    const url = next < urls.length && urls[next].index! <= hit.start ? urls[next] : undefined
     if (url === undefined) {
       out.push(hit)
-    } else if (!out.some(o => o.start === url.index)) {
+    } else if (out.length === 0 || out[out.length - 1].start !== url.index) {
       out.push({ start: url.index!, end: url.index! + url[0].length, label: `url (${hit.label})`, original: url[0] })
     }
   }

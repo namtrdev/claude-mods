@@ -208,7 +208,8 @@ const scanUrlSecrets = (text: string, out: [number, number][]) => {
       e++
     }
     // The userinfo ends at the last `@` before the path, so a secret that itself holds an `@` is masked whole.
-    const at = text.lastIndexOf('@', e - 1)
+    let at = e - 1
+    while (at > v && text.charCodeAt(at) !== 64) at--
     if (at > v && !isPlaceholder(text, v, at)) out.push([v, at])
   }
 }
@@ -229,6 +230,88 @@ const scanPartial = (text: string): [number, number][] => {
     if (out.length === 0 || r[0] >= out[out.length - 1][1]) out.push(r)
   }
   return out
+}
+
+// Detectors that start from a rare anchor instead of trying a regex at every position. A regex such as
+// `\beyJ[...]{8,}\.` restarts at each character of a long run, so input like "-eyJaaaaaaa-eyJaaaaaaa…" took quadratic
+// time (400 KB: 9 s). These find the same matches as the regex in linear time, checked against it on random text.
+type Span = [number, number]
+const isTokenChar = (c: number) => isWordChar(c) || c === 45
+
+// A JWT is `eyJ` + three runs of token characters joined by dots. The runs are scanned once and shared by every
+// `eyJ` that falls inside them.
+const scanJwt = (text: string): Span[] => {
+  const out: Span[] = []
+  const n = text.length
+  const run = (from: number) => {
+    let e = from
+    while (e < n && isTokenChar(text.charCodeAt(e))) e++
+    return e
+  }
+  let runFrom = -1
+  let runTo = -1
+  let memoDot = -1
+  let memoEnd = -1
+  for (let p = text.indexOf('eyJ'); p >= 0;) {
+    if (p > 0 && isWordChar(text.charCodeAt(p - 1))) {
+      p = text.indexOf('eyJ', p + 1)
+      continue
+    }
+    const a = p + 3
+    let dot1: number
+    if (a >= runFrom && a <= runTo) {
+      dot1 = runTo
+    } else {
+      dot1 = run(a)
+      runFrom = a
+      runTo = dot1
+    }
+    if (dot1 - a >= 8 && text.charCodeAt(dot1) === 46) {
+      let end: number
+      if (dot1 === memoDot) {
+        end = memoEnd
+      } else {
+        const dot2 = run(dot1 + 1)
+        end = -1
+        if (dot2 - (dot1 + 1) >= 8 && text.charCodeAt(dot2) === 46) {
+          const last = run(dot2 + 1)
+          if (last - (dot2 + 1) >= 8) end = last
+        }
+        memoDot = dot1
+        memoEnd = end
+      }
+      if (end >= 0) {
+        out.push([p, end])
+        p = text.indexOf('eyJ', end)
+        continue
+      }
+    }
+    p = text.indexOf('eyJ', p + 1)
+  }
+  return out
+}
+
+// A private key block needs an END header after its BEGIN header. Cut the text after the last END header, so a
+// BEGIN with no END anywhere after it is never scanned to the end of the text.
+const PEM = /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g
+const PEM_END = /-----END [A-Z ]*PRIVATE KEY-----/y
+
+const scanPem = (text: string): Span[] => {
+  let cut = -1
+  for (
+    let stop = text.lastIndexOf('-----END ');
+    stop >= 0;
+    stop = stop === 0 ? -1 : text.lastIndexOf('-----END ', stop - 1)
+  ) {
+    PEM_END.lastIndex = stop
+    const m = PEM_END.exec(text)
+    if (m !== null) {
+      cut = stop + m[0].length
+      break
+    }
+  }
+  if (cut < 0) return []
+  return [...text.slice(0, cut).matchAll(PEM)].map(m => [m.index!, m.index! + m[0].length] as Span)
 }
 
 // Value ranges after a secret-looking name. `generic` false: names like password or token, any value of 4+ characters.
@@ -289,8 +372,8 @@ const scanKeyed = (text: string, generic: boolean): [number, number][] => {
   return out
 }
 
-const RULES: { label: string; re: RegExp }[] = [
-  { label: 'private-key', re: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g },
+const RULES: { label: string; re?: RegExp; scan?: (text: string) => [number, number][] }[] = [
+  { label: 'private-key', scan: text => scanPem(text) },
   { label: 'anthropic-key', re: /\bsk-ant-[A-Za-z0-9_-]{20,}/g },
   { label: 'api-key', re: /\bsk-[A-Za-z0-9_-]{20,}/g },
   { label: 'github-token', re: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}|\bgithub_pat_[A-Za-z0-9_]{30,}/g },
@@ -307,7 +390,7 @@ const RULES: { label: string; re: RegExp }[] = [
   { label: 'digitalocean-token', re: /\bdo[opr]_v1_[a-f0-9]{64}\b/g },
   { label: 'twilio-key', re: /\bSK[0-9a-f]{32}\b/g },
   { label: 'docker-token', re: /\bdckr_pat_[A-Za-z0-9_-]{20,}/g },
-  { label: 'jwt', re: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g },
+  { label: 'jwt', scan: text => scanJwt(text) },
   { label: 'bearer-token', re: /\bBearer\s+[A-Za-z0-9._~+/=-]{16,}/g },
 ]
 
@@ -317,7 +400,7 @@ const ALLOWED = /(^|\/)\.env(\.[\w.-]+)?$/
 const labelsIn = (text: string) => {
   const found: string[] = []
   for (const rule of RULES) {
-    for (const _ of text.matchAll(rule.re)) found.push(rule.label)
+    for (const _ of rule.scan !== undefined ? rule.scan(text) : text.matchAll(rule.re!)) found.push(rule.label)
   }
   for (const generic of [false, true]) {
     for (const _ of scanKeyed(text, generic)) found.push('secret')
@@ -329,10 +412,21 @@ const labelsIn = (text: string) => {
 const maskText = (text: string, tally: { n: number }) => {
   let out = text
   for (const rule of RULES) {
-    out = out.replace(rule.re, () => {
-      tally.n += 1
-      return `[hidden:${rule.label}]`
-    })
+    if (rule.scan !== undefined) {
+      let at = 0
+      let next = ''
+      for (const [start, end] of rule.scan(out)) {
+        next += out.slice(at, start) + `[hidden:${rule.label}]`
+        at = end
+        tally.n += 1
+      }
+      out = next + out.slice(at)
+    } else {
+      out = out.replace(rule.re!, () => {
+        tally.n += 1
+        return `[hidden:${rule.label}]`
+      })
+    }
   }
   // The keyed rules run last, on the text the other rules already masked.
   {
