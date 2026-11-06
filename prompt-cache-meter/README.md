@@ -6,7 +6,7 @@ A band above the prompt that shows token usage and prompt-cache status: hit rati
 
 ```
 /plugin marketplace add namtrdev/claude-mods
-/plugin install prompt-cache-meter@jackie-mods
+/plugin install prompt-cache-meter@namtrdev-mods
 ```
 
 ## Use

@@ -6,7 +6,7 @@ Masks API keys, tokens, passwords, card numbers, emails and phone numbers in you
 
 ```
 /plugin marketplace add namtrdev/claude-mods
-/plugin install hide-sensitive@jackie-mods
+/plugin install hide-sensitive@namtrdev-mods
 ```
 
 ## Use

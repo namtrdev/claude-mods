@@ -6,7 +6,7 @@ A band above the prompt that lists the localhost servers listening now, grouped 
 
 ```
 /plugin marketplace add namtrdev/claude-mods
-/plugin install localhost-servers@jackie-mods
+/plugin install localhost-servers@namtrdev-mods
 ```
 
 ## Use

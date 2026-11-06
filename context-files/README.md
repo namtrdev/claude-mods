@@ -6,7 +6,7 @@ A band above the prompt that lists the CLAUDE.md, memory and other instruction f
 
 ```
 /plugin marketplace add namtrdev/claude-mods
-/plugin install context-files@jackie-mods
+/plugin install context-files@namtrdev-mods
 ```
 
 ## Use

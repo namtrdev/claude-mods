@@ -6,7 +6,7 @@ A pane that records every tool call in the session with a timestamp and a pass o
 
 ```
 /plugin marketplace add namtrdev/claude-mods
-/plugin install replay-theater@jackie-mods
+/plugin install replay-theater@namtrdev-mods
 ```
 
 ## Use

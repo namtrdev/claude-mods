@@ -19,7 +19,7 @@ Ten mods for Claude Code: privacy and safety guards, a replay pane, usage, conte
 
 ```
 /plugin marketplace add namtrdev/claude-mods
-/plugin install <mod>@jackie-mods
+/plugin install <mod>@namtrdev-mods
 ```
 
 Each mod folder also has its own README. Icons are from Lucide (ISC), see THIRD_PARTY_NOTICES.md.
