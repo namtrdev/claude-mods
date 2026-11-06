@@ -1,0 +1,38 @@
+{
+  "name": "prompt-cache-meter",
+  "version": "0.1.1",
+  "description": "Band showing token usage, prompt-cache hit ratio, expiry countdown and cache warnings.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Jackie"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "mod"
+  ],
+  "userConfig": {
+    "defaultTtl": {
+      "type": "string",
+      "title": "Default cache TTL",
+      "description": "Which prompt-cache lifetime the countdown assumes until you press a TTL button.",
+      "default": "5m",
+      "options": [
+        "5m",
+        "1h"
+      ]
+    },
+    "showCacheClock": {
+      "type": "boolean",
+      "title": "Show the cache countdown",
+      "description": "Show the second row with the cache clock and the TTL buttons.",
+      "default": true
+    },
+    "showCacheWarnings": {
+      "type": "boolean",
+      "title": "Show cache warnings",
+      "description": "Warn when the cache is about to expire (last 60 seconds) and when the hit ratio drops by 30 points or more between turns.",
+      "default": true
+    }
+  }
+}

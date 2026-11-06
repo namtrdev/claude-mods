@@ -1,0 +1,22 @@
+{
+  "name": "context-files",
+  "version": "0.1.3",
+  "description": "Pane listing the CLAUDE.md, memory and other instruction files this session loaded, by tier, with size.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Jackie"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "mod"
+  ],
+  "userConfig": {
+    "startExpanded": {
+      "type": "boolean",
+      "title": "Start expanded",
+      "description": "Open the band with the full file list; off starts it collapsed to one line.",
+      "default": true
+    }
+  }
+}

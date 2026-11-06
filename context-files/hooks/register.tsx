@@ -1,0 +1,193 @@
+import { atom, read, update } from 'claude-code'
+import type { Register } from 'claude-code'
+
+import { icon } from './icons'
+
+import type { Loaded } from '../types'
+
+const files = atom({ plugin: 'context-files', key: 'files' } as const, [])
+const nested = atom({ plugin: 'context-files', key: 'nested' } as const, [])
+const isExpanded = atom({ plugin: 'context-files', key: 'isExpanded' } as const, true)
+
+const ORDER = ['managed', 'user', 'project', 'local', 'memory', 'nested']
+const COLOR: Record<string, string> = {
+  managed: '#ff7a7a',
+  user: '#5fe3ff',
+  project: '#7dff9a',
+  local: '#ffe066',
+  memory: '#ff8ae8',
+  nested: '#c4a7ff',
+}
+
+// A nested_memory attachment reads "Contents of <path>:\n\n<text>", one block per file.
+const NESTED_HEAD = /^Contents of (.+?):\n/gm
+
+const parseNested = (text: string): Loaded[] => {
+  const heads = [...text.matchAll(NESTED_HEAD)]
+
+  return heads.map((head, i) => {
+    const start = (head.index ?? 0) + head[0].length
+    const end = i + 1 < heads.length ? (heads[i + 1].index ?? text.length) : text.length
+
+    return { path: head[1], kind: 'nested', chars: Math.max(0, end - start) }
+  })
+}
+
+const tokens = (chars: number) => {
+  const n = Math.round(chars / 4)
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
+}
+
+export const register: Register = (on, options) => {
+  on('session.start', async ($, e, next) => {
+    await $.command.register({
+      name: 'context-files',
+      description: 'Expand or collapse the loaded-instruction-files band',
+    })
+    await update($, isExpanded, () => options.startExpanded !== false)
+    $.ui.invalidate('prompt.context')
+
+    return next(e)
+  })
+
+  on('command.run', { command: 'context-files' }, async $ => {
+    const was = await read($, isExpanded)
+    await update($, isExpanded, () => !was)
+
+    return { text: was ? 'Context files band collapsed.' : 'Context files band expanded.' }
+  })
+
+  on('prompt.context', async ($, e, next) => {
+    const out = await next(e)
+    const list = out.instructionFiles ?? e.instructionFiles ?? []
+    const loaded: Loaded[] = [...new Map(list.map(one => [one.path, {
+      path: one.path,
+      kind: one.kind,
+      chars: one.content.length,
+      parent: one.parent,
+    }])).values()]
+    await update($, files, () => loaded)
+    // prompt.context fires at the start of a conversation and after compaction or /clear;
+    // lazily loaded files are re-attached after that, so start the nested list over.
+    await update($, nested, () => [])
+
+    return out
+  })
+
+  on('prompt.attachment', { type: 'nested_memory' }, async ($, e, next) => {
+    const found = parseNested(e.text)
+    if (found.length > 0) {
+      await update($, nested, prev => [
+        ...prev.filter(one => !found.some(f => f.path === one.path)),
+        ...found,
+      ])
+    }
+
+    return next(e)
+  })
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey) {
+      return next(e)
+    }
+
+    const ui = $.ui.resolve(e)
+    const { Box, Button, Text } = ui
+    const rest = await next(e)
+    const stack = (band: unknown) => (rest && rest.type !== 'engine' ? <Box flexDirection="column" gap={2}>{rest}<Box height={0.1} backgroundColor="#3a3f4b" />{band}</Box> : band)
+    const hasSvg = ui.Svg !== undefined
+    const [loaded, lazy, open] = [await read($, files), await read($, nested), await read($, isExpanded)]
+    const list = [...loaded, ...lazy.filter(one => !loaded.some(f => f.path === one.path))]
+    const total = list.reduce((sum, one) => sum + one.chars, 0)
+    const cols = e.viewport?.columns ?? 80
+    const groups = ORDER.map(kind => {
+      const group = list.filter(one => one.kind === kind)
+      return { kind, count: group.length, chars: group.reduce((a, one) => a + one.chars, 0) }
+    }).filter(one => one.count > 0)
+    const pct = (part: number) => (total === 0 ? 0 : Math.round((part / total) * 100))
+    const cells = (part: number, width: number) =>
+      total === 0 ? 0 : Math.max(1, Math.round((part / total) * width))
+    const stacked = (width: number) =>
+      groups.map(one => (
+        <Text color={COLOR[one.kind]}>{'▓'.repeat(cells(one.chars, width))}</Text>
+      ))
+    const summary =
+      list.length === 0 ? 'no instruction files loaded yet' : `${list.length} files · ~${tokens(total)} tok`
+
+    const toggle = (
+      <Box gap={1}>
+        {hasSvg && icon(ui, open ? 'chevron-down' : 'chevron-right', '#9ca3af', '')}
+        <Button
+          key="toggle"
+          label={hasSvg ? (open ? 'Collapse' : 'Expand  ') : open ? '▾ Collapse' : '▸ Expand  '}
+          onPress={() => update($, isExpanded, () => !open)}
+        />
+      </Box>
+    )
+
+    if (!open) {
+      return stack(
+        <Box gap={2}>
+          {toggle}
+          <Text bold>CONTEXT</Text>
+          <Text dimColor>{summary}</Text>
+          <Box>{stacked(Math.max(8, Math.min(24, cols - 50)))}</Box>
+        </Box>
+      )
+    }
+
+    const bar = Math.max(10, Math.min(30, cols - 30))
+
+    return stack(
+      <Box flexDirection="column" gap={1}>
+        <Box gap={2}>
+          {toggle}
+          <Text bold>CONTEXT</Text>
+          <Text dimColor>{summary}</Text>
+        </Box>
+        {groups.length > 0 && (
+          <Box flexDirection="column" gap={1}>
+            <Box>{stacked(Math.max(10, Math.min(60, cols - 10)))}</Box>
+            <Box gap={2}>
+              {groups.map(one => (
+                <Text color={COLOR[one.kind]}>
+                  {one.kind} {one.count} · {tokens(one.chars)}
+                </Text>
+              ))}
+            </Box>
+          </Box>
+        )}
+        {groups.map(group => (
+          <Box flexDirection="column">
+            <Text bold color={COLOR[group.kind]}>
+              {group.kind.toUpperCase()}
+            </Text>
+            {list
+              .filter(one => one.kind === group.kind)
+              .map(one => {
+                const name = one.path.split('/').pop() ?? one.path
+                const dir = one.path.slice(0, one.path.length - name.length).replace(/^\/Users\/[^/]+/, '~')
+                const n = cells(one.chars, bar)
+                return (
+                  <Box key={one.path} gap={1} hover={{ backgroundColor: '#2b3140' }}>
+                    {one.parent !== undefined && icon(ui, 'corner-down-right', '#9ca3af', '↳')}
+                    {hasSvg && icon(ui, 'file-text', COLOR[group.kind], '')}
+                    <Text bold hover={{ color: COLOR[group.kind] }}>
+                      {name}
+                    </Text>
+                    <Text color={COLOR[group.kind]}>{'▓'.repeat(Math.min(n, 8))}</Text>
+                    <Text dimColor hover={{ dimColor: false }}>
+                      {tokens(one.chars)} tok · {pct(one.chars)}%
+                    </Text>
+                    <Text dimColor hover={{ dimColor: false }}>
+                      {dir}
+                    </Text>
+                  </Box>
+                )
+              })}
+          </Box>
+        ))}
+      </Box>
+    )
+  })
+}
