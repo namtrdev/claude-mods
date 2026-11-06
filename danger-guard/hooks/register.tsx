@@ -5,8 +5,26 @@ import type { GuardEvent } from '../types'
 
 const events = atom({ plugin: 'danger-guard', key: 'events' } as const, [])
 
+// `curl … | sh` in linear time. As a single regex, `[^|]*` rescans to the end of the command for every curl or wget,
+// so a long command with many of them and no pipe took quadratic time (400 KB: 1.6 s). From each curl or wget only the
+// first `|` after it can match, so look at that one, and let every curl before the same pipe share the answer.
+const AFTER_PIPE = /\|\s*(?:sudo\s+)?(?:ba|z)?sh\b/y
+
+const pipesToShell = (command: string) => {
+  const word = /\b(?:curl|wget)\b/g
+  for (let m = word.exec(command); m !== null; m = word.exec(command)) {
+    const pipe = command.indexOf('|', m.index + m[0].length)
+    if (pipe < 0) return false
+    AFTER_PIPE.lastIndex = pipe
+    if (AFTER_PIPE.test(command)) return true
+    word.lastIndex = pipe
+  }
+  return false
+}
+
 // deny: no sensible reason to ever do this; ask: legitimate but irreversible.
-const RULES: { re: RegExp; verdict: 'ask' | 'deny'; reason: string }[] = [
+// `re` finds the rule's candidate; `also`, when present, must agree too.
+const RULES: { re: RegExp; also?: (command: string) => boolean; verdict: 'ask' | 'deny'; reason: string }[] = [
   { re: /\brm\s+(-\w*\s+)*-\w*[rf]\w*\s+(-\w+\s+)*(\/|~|\$HOME|\/\*)(\s|$)/, verdict: 'deny', reason: 'recursive delete of root or home' },
   { re: /:\(\)\s*\{\s*:\|:&\s*\};:/, verdict: 'deny', reason: 'fork bomb' },
   { re: />\s*\/dev\/(sd|nvme|disk)\w*/, verdict: 'deny', reason: 'writes to a raw disk' },
@@ -15,7 +33,7 @@ const RULES: { re: RegExp; verdict: 'ask' | 'deny'; reason: string }[] = [
   { re: /\bgit\s+push\b.*(--force\b|\s-f\b)/, verdict: 'ask', reason: 'force push rewrites remote history' },
   { re: /\bgit\s+(reset\s+--hard|clean\s+-\w*f|checkout\s+--\s|restore\s+\.)/, verdict: 'ask', reason: 'discards uncommitted work' },
   { re: /\bgit\s+branch\s+-D\b/, verdict: 'ask', reason: 'deletes a branch with unmerged work' },
-  { re: /\b(curl|wget)\b[^|]*\|\s*(sudo\s+)?(ba|z)?sh\b/, verdict: 'ask', reason: 'runs a remote script' },
+  { re: /\b(curl|wget)\b/, also: pipesToShell, verdict: 'ask', reason: 'runs a remote script' },
   { re: /\bchmod\s+(-R\s+)?[0-7]*777\b/, verdict: 'ask', reason: 'world-writable permissions' },
   { re: /\bsudo\b/, verdict: 'ask', reason: 'runs with root privileges' },
   { re: /\bdrop\s+(table|database|schema)\b|\btruncate\s+table\b/i, verdict: 'ask', reason: 'drops database data' },
@@ -63,7 +81,7 @@ export const register: Register = (on, options) => {
   on('tool.check', { tool: 'Bash' }, async ($, e, next) => {
     const command = String((e.input as { command?: unknown }).command ?? '')
     const rule =
-      rules.find(one => one.re.test(command)) ??
+      rules.find(one => one.re.test(command) && (one.also === undefined || one.also(command))) ??
       (extraCommands.some(re => re.test(command))
         ? { verdict: 'ask' as const, reason: 'matches one of your commands to confirm' }
         : undefined)
