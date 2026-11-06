@@ -12,6 +12,16 @@ const RULES: { label: string; re: RegExp }[] = [
   { label: 'aws-key', re: /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g },
   { label: 'slack-token', re: /\bxox[abprs]-[A-Za-z0-9-]{10,}/g },
   { label: 'google-key', re: /\bAIza[0-9A-Za-z_-]{35}\b/g },
+  { label: 'stripe-key', re: /\b(?:[sr]k_(?:live|test)|whsec)_[A-Za-z0-9]{16,}/g },
+  { label: 'gitlab-token', re: /\bglpat-[A-Za-z0-9_-]{20,}/g },
+  { label: 'npm-token', re: /\bnpm_[A-Za-z0-9]{36}\b/g },
+  { label: 'huggingface-token', re: /\bhf_[A-Za-z0-9]{30,}/g },
+  { label: 'sendgrid-key', re: /\bSG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}/g },
+  { label: 'pypi-token', re: /\bpypi-[A-Za-z0-9_-]{50,}/g },
+  { label: 'shopify-token', re: /\bshp(?:at|ca|pa|ss)_[a-f0-9]{32}\b/g },
+  { label: 'digitalocean-token', re: /\bdo[opr]_v1_[a-f0-9]{64}\b/g },
+  { label: 'twilio-key', re: /\bSK[0-9a-f]{32}\b/g },
+  { label: 'docker-token', re: /\bdckr_pat_[A-Za-z0-9_-]{20,}/g },
   { label: 'jwt', re: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g },
   { label: 'bearer-token', re: /\bBearer\s+[A-Za-z0-9._~+/=-]{16,}/g },
   { label: 'email', re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g },
@@ -166,6 +176,10 @@ const NOT_SECRET = new Set([
   'optional',
   'changeme',
   'redacted',
+  'example',
+  'sample',
+  'dummy',
+  'placeholder',
 ])
 // The name itself as a value: a capitalised Token or an upper-case TOKEN is a type or a placeholder, but a lowercase
 // one is a real default credential, so only the capitalised forms are skipped.
@@ -180,6 +194,64 @@ const isPlaceholder = (text: string, v: number, e: number) => {
   const core = value.replace(/[,;)\]}]+$/, '')
   const low = core.toLowerCase()
   return NOT_SECRET.has(low) || (NAME_AS_VALUE.has(low) && core.charCodeAt(0) < 97)
+}
+
+// Secrets that are only part of a longer match: the password in a connection string, the credentials after
+// `Authorization: Basic`, after `curl -u user:`, and the cookies of a Cookie header. Each regex is [prefix][secret]:
+// the prefix stays, the secret is masked.
+const BASIC_HEADER =
+  /(\bAuthorization["']?\s*[:=]\s*["']?(?:Basic|Digest|Negotiate|NTLM|token)\s+)([A-Za-z0-9+/=._~-]{8,})/gi
+const CURL_USER =
+  /((?:^|[\s'"])(?:-u|--user|--proxy-user)(?:\s+|=)["']?(?!\d+:\d+(?:[\s"']|$))[^\s:"'@]+:)([^\s"'`]{3,})/g
+const COOKIE_HEADER = /(\b(?:Set-)?Cookie["']?\s*[:=]\s*["']?)((?=[\w.-]+=)[^\n"']{8,})/gi
+
+// `scheme://user:secret@host`: found from each `://`, with no regex. The secret ends at the `@`.
+const scanUrlSecrets = (text: string, out: [number, number][]) => {
+  const n = text.length
+  for (let p = text.indexOf('://'); p >= 0; p = text.indexOf('://', p + 3)) {
+    const before = text.charCodeAt(p - 1)
+    if (p === 0 || !isWordChar(before)) continue
+    let k = p + 3
+    let ended = false
+    while (k < n) {
+      const c = text.charCodeAt(k)
+      if (c === 58) {
+        ended = true
+        break
+      }
+      if (c === 64 || c === 47 || c === 63 || c === 35 || isSpace(c)) break
+      k++
+    }
+    if (!ended) continue
+    const v = k + 1
+    let e = v
+    while (e < n) {
+      const c = text.charCodeAt(e)
+      if (c === 47 || c === 63 || c === 35 || isSpace(c)) break
+      e++
+    }
+    // The userinfo ends at the last `@` before the path, so a secret that itself holds an `@` is masked whole.
+    const at = text.lastIndexOf('@', e - 1)
+    if (at > v && !isPlaceholder(text, v, at)) out.push([v, at])
+  }
+}
+
+const scanPartial = (text: string): [number, number][] => {
+  const found: [number, number][] = []
+  for (const re of [BASIC_HEADER, CURL_USER, COOKIE_HEADER]) {
+    for (const m of text.matchAll(re)) {
+      const start = m.index! + m[1].length
+      const end = start + m[2].length
+      if (!isPlaceholder(text, start, end)) found.push([start, end])
+    }
+  }
+  scanUrlSecrets(text, found)
+  found.sort((a, b) => a[0] - b[0] || b[1] - a[1])
+  const out: [number, number][] = []
+  for (const r of found) {
+    if (out.length === 0 || r[0] >= out[out.length - 1][1]) out.push(r)
+  }
+  return out
 }
 
 // Value ranges after a secret-looking name. `generic` false: names like password or token, any value of 4+ characters.
@@ -207,6 +279,7 @@ const scanKeyed = (text: string, generic: boolean): [number, number][] => {
         }
       }
     }
+    if (j >= 0 && text.charCodeAt(j) === 93) j-- // a name in brackets: os.environ["NAME"] = "value"
     if (j >= 0) {
       // A closing quote may sit between the name and the separator, as in JSON: "name": "value".
       const q = text.charCodeAt(j)
@@ -282,6 +355,9 @@ const find = (text: string): Hit[] => {
       for (const [start, end] of scanKeyed(text, generic)) {
         hits.push({ start, end, label: 'secret', original: text.slice(start, end) })
       }
+    }
+    for (const [start, end] of scanPartial(text)) {
+      hits.push({ start, end, label: 'secret', original: text.slice(start, end) })
     }
   }
   if (cfg.card) add(CARD, 'card', isCard)
