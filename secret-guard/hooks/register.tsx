@@ -4,7 +4,30 @@ import type { Register } from 'claude-code'
 const isOn = atom({ plugin: 'secret-guard', key: 'isOn' } as const, true)
 const masked = atom({ plugin: 'secret-guard', key: 'masked' } as const, 0)
 
-const RULES: { label: string; re: RegExp }[] = [
+// Value of a key whose name ends in key/credential/auth/passphrase. Plain words and ids also sit behind such
+// names, so a value only counts when it looks random: long, mixed letters and digits, high entropy, no placeholder word.
+const PLACEHOLDER_WORD = /test|example|fake|dummy|sample|placeholder|changeme|your[_-]|xxxx/i
+
+const entropy = (s: string) => {
+  const counts = new Map<string, number>()
+  for (const c of s) counts.set(c, (counts.get(c) ?? 0) + 1)
+  let h = 0
+  for (const n of counts.values()) h -= (n / s.length) * Math.log2(n / s.length)
+  return h
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const looksRandom = (s: string) => {
+  if (!/[A-Za-z]/.test(s) || !/\d/.test(s) || PLACEHOLDER_WORD.test(s)) return false
+  // Paths and UUIDs are ids, not secrets. Two or more lowercase words joined by - _ . read as a name.
+  if (/^[/.~]/.test(s) || UUID.test(s)) return false
+  if (s.split(/[-_.]/).filter(w => /^[a-z]{3,}$/.test(w)).length >= 2) return false
+  // Hex has only 16 symbols, so its entropy tops out near 4 bits: it needs a lower bar.
+  return entropy(s) >= (/^[0-9a-f]+$/i.test(s) ? 3.0 : 3.5)
+}
+
+const RULES: { label: string; re: RegExp; ok?: (match: string) => boolean }[] = [
   { label: 'private-key', re: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g },
   { label: 'anthropic-key', re: /\bsk-ant-[A-Za-z0-9_-]{20,}/g },
   { label: 'api-key', re: /\bsk-[A-Za-z0-9_-]{20,}/g },
@@ -15,6 +38,7 @@ const RULES: { label: string; re: RegExp }[] = [
   { label: 'jwt', re: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g },
   { label: 'bearer-token', re: /\bBearer\s+[A-Za-z0-9._~+/=-]{16,}/g },
   { label: 'secret', re: /(?<=(?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key)\s*[=:]\s*["']?)[^\s"'`]{4,}/gi },
+  { label: 'secret', re: /(?<=(?:key|credentials?|auth|passphrase)["']?\s*[=:]\s*["']?)[A-Za-z0-9_+/=.-]{16,}/gi, ok: looksRandom },
 ]
 
 // Files meant to hold secrets.
@@ -23,7 +47,9 @@ const ALLOWED = /(^|\/)\.env(\.[\w.-]+)?$/
 const labelsIn = (text: string) => {
   const found: string[] = []
   for (const rule of RULES) {
-    for (const _ of text.matchAll(rule.re)) found.push(rule.label)
+    for (const m of text.matchAll(rule.re)) {
+      if (rule.ok === undefined || rule.ok(m[0])) found.push(rule.label)
+    }
   }
   return found
 }
@@ -31,7 +57,8 @@ const labelsIn = (text: string) => {
 const maskText = (text: string, tally: { n: number }) => {
   let out = text
   for (const rule of RULES) {
-    out = out.replace(rule.re, () => {
+    out = out.replace(rule.re, match => {
+      if (rule.ok !== undefined && !rule.ok(match)) return match
       tally.n += 1
       return rule.label === 'secret' ? '[hidden:secret]' : `[hidden:${rule.label}]`
     })
