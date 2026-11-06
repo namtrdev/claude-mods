@@ -69,10 +69,10 @@ const lastLetters = (list: number[][]) => list.reduce((m, w) => m | (1 << (w[w.l
 const ASSIGN_LAST = lastLetters(ASSIGN_NAMES)
 const GENERIC_LAST = lastLetters(GENERIC_NAMES)
 
-// Does a key name end at text[j]? Letters compare case-insensitively through `| 32`.
+// Length of the name from `list` that ends at text[j], or 0. Letters compare case-insensitively through `| 32`.
 const nameEndsAt = (text: string, j: number, list: number[][], last: number) => {
   const lc = text.charCodeAt(j) | 32
-  if ((lc - 97) >>> 0 >= 26 || ((last >>> (lc - 97)) & 1) === 0) return false
+  if ((lc - 97) >>> 0 >= 26 || ((last >>> (lc - 97)) & 1) === 0) return 0
   for (const w of list) {
     const top = w.length - 1
     if (j < top) continue
@@ -82,9 +82,9 @@ const nameEndsAt = (text: string, j: number, list: number[][], last: number) => 
       if ((w[k] >= 97 ? c | 32 : c) !== w[k]) break
       k--
     }
-    if (k < 0) return true
+    if (k < 0) return w.length
   }
-  return false
+  return 0
 }
 
 const PLACEHOLDER_WORD = /test|example|fake|dummy|sample|placeholder|changeme|your[_-]|xxxx/i
@@ -135,6 +135,53 @@ const isRandomRun = (text: string, v: number, e: number) => {
   return !(len === 36 && UUID.test(value)) && !PLACEHOLDER_WORD.test(value)
 }
 
+// Type names that sit between a name and `=` in declarations: `let name: string = value`, `var name string = value`.
+const TYPE_NAMES = codes(['string', 'str', 'number', 'int', 'integer', 'bool', 'boolean', 'any', 'bytes'])
+const TYPE_LAST = lastLetters(TYPE_NAMES)
+const isWordChar = (c: number) => c < 128 && ((CLS[c] & (F_ALPHA | F_DIGIT)) !== 0 || c === 95)
+
+// Values that follow a secret-looking name but are not secrets: type names, null-like words, references to an
+// environment variable or template, and masks. Masking them only hides code and docs from the model.
+const NOT_SECRET = new Set([
+  'string',
+  'str',
+  'number',
+  'int',
+  'integer',
+  'bool',
+  'boolean',
+  'any',
+  'bytes',
+  'object',
+  'unknown',
+  'type',
+  'value',
+  'null',
+  'none',
+  'nil',
+  'undefined',
+  'true',
+  'false',
+  'required',
+  'optional',
+  'changeme',
+  'redacted',
+])
+// The name itself as a value: a capitalised Token or an upper-case TOKEN is a type or a placeholder, but a lowercase
+// one is a real default credential, so only the capitalised forms are skipped.
+const NAME_AS_VALUE = new Set(['password', 'passwd', 'secret', 'token', 'key'])
+const PLACEHOLDER_SHAPE =
+  /^(?:<[^<>]*>[,;]?|\$(?:[{(]|[A-Z_][A-Z0-9_]*[,;)}\]]*$)|\{\{|%[^%\s]+%$|\[(?:hidden:|REDACTED)|[*xX.#-]{3,}[,;]?$)/
+const ENV_REFERENCE = /^(?:process\.env|os\.environ|os\.getenv|System\.getenv|env\.|ENV\[|getenv\()/i
+
+const isPlaceholder = (text: string, v: number, e: number) => {
+  const value = text.slice(v, e)
+  if (PLACEHOLDER_SHAPE.test(value) || ENV_REFERENCE.test(value)) return true
+  const core = value.replace(/[,;)\]}]+$/, '')
+  const low = core.toLowerCase()
+  return NOT_SECRET.has(low) || (NAME_AS_VALUE.has(low) && core.charCodeAt(0) < 97)
+}
+
 // Value ranges after a secret-looking name. `generic` false: names like password or token, any value of 4+ characters.
 // `generic` true: names like key or auth, a value of 16+ characters that also looks random.
 const scanKeyed = (text: string, generic: boolean): [number, number][] => {
@@ -148,11 +195,24 @@ const scanKeyed = (text: string, generic: boolean): [number, number][] => {
     if (c !== 61 && c !== 58) continue
     let j = i - 1
     while (j >= 0 && isSpace(text.charCodeAt(j))) j--
-    if (generic && j >= 0) {
+    if (c === 61 && j >= 0) {
+      // `name: string = value` and `name string = value`: step over the type, and the colon before it.
+      const size = nameEndsAt(text, j, TYPE_NAMES, TYPE_LAST)
+      if (size > 0 && (j - size < 0 || !isWordChar(text.charCodeAt(j - size)))) {
+        j -= size
+        while (j >= 0 && isSpace(text.charCodeAt(j))) j--
+        if (j >= 0 && text.charCodeAt(j) === 58) {
+          j--
+          while (j >= 0 && isSpace(text.charCodeAt(j))) j--
+        }
+      }
+    }
+    if (j >= 0) {
+      // A closing quote may sit between the name and the separator, as in JSON: "name": "value".
       const q = text.charCodeAt(j)
       if (q === 34 || q === 39) j--
     }
-    if (j < 0 || !nameEndsAt(text, j, names, last)) continue
+    if (j < 0 || nameEndsAt(text, j, names, last) === 0) continue
     let v = i + 1
     while (v < n && isSpace(text.charCodeAt(v))) v++
     if (v < n) {
@@ -171,6 +231,7 @@ const scanKeyed = (text: string, generic: boolean): [number, number][] => {
       e++
     }
     if (e - v < min) continue
+    if (!generic && isPlaceholder(text, v, e)) continue
     if (!generic || isRandomRun(text, v, e)) out.push([v, e])
     // Resume at the last matched character: it may itself be the `=` or `:` that introduces the next value.
     i = e - 2
