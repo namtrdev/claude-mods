@@ -22,6 +22,45 @@ const pipesToShell = (command: string) => {
   return false
 }
 
+// `head ... tail` on one line, in linear time. A regex such as `\bgit\s+push\b.*(--force|-f\b)` rescans to the end
+// of the line for every `git push`, so a long line with many of them took quadratic time (400 KB: 5 s). Once a line
+// has been tested from one head, a later head on the same line has a shorter tail and cannot match either.
+const isLineBreak = (c: number) => c === 10 || c === 13 || c === 0x2028 || c === 0x2029
+
+const onOneLine = (command: string, head: RegExp, tail: (from: number, to: number) => boolean) => {
+  head.lastIndex = 0
+  let testedFrom = -1
+  let testedTo = -1
+  for (let m = head.exec(command); m !== null; m = head.exec(command)) {
+    const from = m.index + m[0].length
+    if (from >= testedFrom && from <= testedTo) continue
+    let to = from
+    while (to < command.length && !isLineBreak(command.charCodeAt(to))) to++
+    if (tail(from, to)) return true
+    testedFrom = from
+    testedTo = to
+  }
+  return false
+}
+
+const GIT_PUSH = /\bgit\s+push\b/g
+const FORCE_FLAG = /--force\b|\s-f\b/
+const FORCE_FLAG_AT_BREAK = /\s-f\b/y // the `\s` may be the line break itself, with `-f` opening the next line
+
+const pushesForce = (command: string) =>
+  onOneLine(command, GIT_PUSH, (from, to) => {
+    if (FORCE_FLAG.test(command.slice(from, to))) return true
+    FORCE_FLAG_AT_BREAK.lastIndex = to
+    return to < command.length && FORCE_FLAG_AT_BREAK.test(command)
+  })
+
+const DD = /\bdd\s+/g
+const DD_TO_DEVICE = /\bof=\/dev\//
+const MKFS = /\bmkfs\b/
+
+const overwritesDisk = (command: string) =>
+  MKFS.test(command) || onOneLine(command, DD, (from, to) => DD_TO_DEVICE.test(command.slice(from, to)))
+
 // deny: no sensible reason to ever do this; ask: legitimate but irreversible.
 // `re` finds the rule's candidate; `also`, when present, must agree too.
 const RULES: { re: RegExp; also?: (command: string) => boolean; verdict: 'ask' | 'deny'; reason: string }[] = [
@@ -32,9 +71,9 @@ const RULES: { re: RegExp; also?: (command: string) => boolean; verdict: 'ask' |
   },
   { re: /:\(\)\s*\{\s*:\|:&\s*\};:/, verdict: 'deny', reason: 'fork bomb' },
   { re: />\s*\/dev\/(sd|nvme|disk)\w*/, verdict: 'deny', reason: 'writes to a raw disk' },
-  { re: /\bmkfs\b|\bdd\s+.*\bof=\/dev\//, verdict: 'deny', reason: 'formats or overwrites a disk' },
+  { re: /\bmkfs\b|\bdd\s/, also: overwritesDisk, verdict: 'deny', reason: 'formats or overwrites a disk' },
   { re: /\brm\s+(-\w*\s+)*-\w*[rf]\w*\b/, verdict: 'ask', reason: 'recursive or forced delete' },
-  { re: /\bgit\s+push\b.*(--force\b|\s-f\b)/, verdict: 'ask', reason: 'force push rewrites remote history' },
+  { re: /\bgit\s+push\b/, also: pushesForce, verdict: 'ask', reason: 'force push rewrites remote history' },
   {
     re: /\bgit\s+(reset\s+--hard|clean\s+-\w*f|checkout\s+--\s|restore\s+\.)/,
     verdict: 'ask',
