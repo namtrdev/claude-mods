@@ -21,6 +21,30 @@ const RULES: { label: string; re: RegExp }[] = [
 // Value of key=value or key: value where the key names a secret.
 const ASSIGN = /(?<=(?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key)\s*[=:]\s*["']?)[^\s"'`]{4,}/gi
 
+// Value of a key whose name ends in key/credential/auth/passphrase. Plain words and ids also sit behind such
+// names, so a value only counts when it looks random: long, mixed letters and digits, high entropy, no placeholder word.
+const GENERIC = /(?<=(?:key|credentials?|auth|passphrase)["']?\s*[=:]\s*["']?)[A-Za-z0-9_+/=.-]{16,}/gi
+const PLACEHOLDER_WORD = /test|example|fake|dummy|sample|placeholder|changeme|your[_-]|xxxx/i
+
+const entropy = (s: string) => {
+  const counts = new Map<string, number>()
+  for (const c of s) counts.set(c, (counts.get(c) ?? 0) + 1)
+  let h = 0
+  for (const n of counts.values()) h -= (n / s.length) * Math.log2(n / s.length)
+  return h
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const looksRandom = (s: string) => {
+  if (!/[A-Za-z]/.test(s) || !/\d/.test(s) || PLACEHOLDER_WORD.test(s)) return false
+  // Paths and UUIDs are ids, not secrets. Two or more lowercase words joined by - _ . read as a name.
+  if (/^[/.~]/.test(s) || UUID.test(s)) return false
+  if (s.split(/[-_.]/).filter(w => /^[a-z]{3,}$/.test(w)).length >= 2) return false
+  // Hex has only 16 symbols, so its entropy tops out near 4 bits: it needs a lower bar.
+  return entropy(s) >= (/^[0-9a-f]+$/i.test(s) ? 3.0 : 3.5)
+}
+
 // Strict phone shapes only: +<country code> numbers and Vietnamese mobile numbers (03/05/07/08/09).
 const PHONE = /(?<![\w+])(?:\+\d{1,3}[ .-]?\d{1,4}(?:[ .-]?\d{2,4}){2,4}|0[35789](?:[ .-]?\d){8})(?![\w])/g
 
@@ -60,6 +84,7 @@ const find = (text: string): Hit[] => {
     if (rule.label === 'email' ? cfg.email : cfg.keys) add(rule.re, rule.label)
   }
   if (cfg.keys) add(ASSIGN, 'secret')
+  if (cfg.keys) add(GENERIC, 'secret', looksRandom)
   if (cfg.card) add(CARD, 'card', isCard)
   if (cfg.phone) add(PHONE, 'phone')
   for (const re of cfg.extra) add(re, 'custom')
