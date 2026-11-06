@@ -1,0 +1,8 @@
+node_modules/
+package-lock.json
+**/.claude-plugin/types/
+.husky/_/
+.claude/
+# Manifests are written by the claude CLI, and the docs are prose: both are left as they are.
+**/.claude-plugin/*.json
+*.md
