@@ -11,13 +11,54 @@ const risky = atom({ plugin: 'blast-radius', key: 'risky' } as const, [])
 const commands = atom({ plugin: 'blast-radius', key: 'commands' } as const, 0)
 
 const WRITERS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
-const RULES: { re: RegExp; reason: string; weight: number }[] = [
+
+// `head ... tail` on one line, in linear time. A regex such as `\bgit\s+push\b.*(--force|-f\b)` rescans to the end
+// of the line for every `git push`, so a long line with many of them took quadratic time (400 KB: 5 s). Once a line
+// has been tested from one head, a later head on the same line has a shorter tail and cannot match either.
+const isLineBreak = (c: number) => c === 10 || c === 13 || c === 0x2028 || c === 0x2029
+
+const onOneLine = (command: string, head: RegExp, tail: (from: number, to: number) => boolean) => {
+  head.lastIndex = 0
+  let testedFrom = -1
+  let testedTo = -1
+  for (let m = head.exec(command); m !== null; m = head.exec(command)) {
+    const from = m.index + m[0].length
+    if (from >= testedFrom && from <= testedTo) continue
+    let to = from
+    while (to < command.length && !isLineBreak(command.charCodeAt(to))) to++
+    if (tail(from, to)) return true
+    testedFrom = from
+    testedTo = to
+  }
+  return false
+}
+
+const GIT_PUSH = /\bgit\s+push\b/g
+const FORCE_FLAG = /--force|-f\b/
+const REMOTE_FETCH = /\b(?:curl|wget)\b/g
+const PIPE_TO_SHELL = /\|\s*(?:sh|bash)/y // `\s*` may cross a line break, so it is tested on the whole command
+
+const pushesForce = (command: string) =>
+  onOneLine(command, GIT_PUSH, (from, to) => FORCE_FLAG.test(command.slice(from, to)))
+
+const pipesRemoteScript = (command: string) =>
+  onOneLine(command, REMOTE_FETCH, (from, to) => {
+    for (let at = command.indexOf('|', from); at >= 0 && at < to; at = command.indexOf('|', at + 1)) {
+      PIPE_TO_SHELL.lastIndex = at
+      if (PIPE_TO_SHELL.test(command)) return true
+    }
+    return false
+  })
+
+// `re` finds the rule's candidate; `also`, when present, must agree too.
+type Rule = { re: RegExp; also?: (command: string) => boolean; reason: string; weight: number }
+const RULES: Rule[] = [
   { re: /\brm\s+(-\w*[rf]\w*\s+)+/, reason: 'recursive delete', weight: 8 },
-  { re: /\bgit\s+push\b.*(--force|-f\b)/, reason: 'force push', weight: 9 },
+  { re: /\bgit\s+push\b/, also: pushesForce, reason: 'force push', weight: 9 },
   { re: /\bgit\s+(reset\s+--hard|clean\s+-\w*f)/, reason: 'discards work', weight: 7 },
   { re: /\bgit\s+push\b/, reason: 'publishes commits', weight: 4 },
   { re: /\b(sudo|chmod|chown)\b/, reason: 'privileged change', weight: 6 },
-  { re: /\b(curl|wget)\b.*\|\s*(sh|bash)/, reason: 'runs remote script', weight: 9 },
+  { re: /\b(curl|wget)\b/, also: pipesRemoteScript, reason: 'runs remote script', weight: 9 },
   { re: /\b(npm|pnpm|yarn|pip)\s+(install|add|i)\b/, reason: 'installs packages', weight: 3 },
   { re: /\bdrop\s+(table|database)\b/i, reason: 'drops data', weight: 9 },
   { re: />\s*[^\s&>|]+/, reason: 'writes via redirect', weight: 2 },
@@ -47,7 +88,7 @@ const parse = (raw: unknown) =>
     })
 
 export const register: Register = (on, options) => {
-  const extraRules = parse(options.extraRiskyPatterns).map(re => ({ re, reason: 'your pattern', weight: 5 }))
+  const extraRules: Rule[] = parse(options.extraRiskyPatterns).map(re => ({ re, reason: 'your pattern', weight: 5 }))
   const toastFrom = Number(options.toastFrom ?? 7)
 
   on('session.start', async ($, e, next) => {
@@ -83,7 +124,9 @@ export const register: Register = (on, options) => {
     } else if (e.tool === 'Bash') {
       const command = String((e as Record<string, unknown>).command ?? '')
       await update($, commands, n => n + 1)
-      const rule = [...RULES, ...extraRules].filter(r => r.re.test(command)).sort((a, b) => b.weight - a.weight)[0]
+      const rule = [...RULES, ...extraRules]
+        .filter(r => r.re.test(command) && (r.also === undefined || r.also(command)))
+        .sort((a, b) => b.weight - a.weight)[0]
       if (rule !== undefined) {
         await update($, risky, list =>
           [...list, { command: command.slice(0, 120), reason: rule.reason, weight: rule.weight }].slice(-50),
